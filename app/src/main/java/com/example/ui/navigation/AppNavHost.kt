@@ -268,10 +268,15 @@ fun AppNavHost(
             deepLinks = AppRouter.createDeepLinks(AppRouter.routeForModule(AppModule.SETTINGS))
         ) {
             val syncStatus by viewModel.syncStatus.collectAsState()
+            val backupJson by viewModel.backupJsonString.collectAsState()
+            val restoreMessage by viewModel.restoreMessage.collectAsState()
+
             SettingsScreen(
                 isDarkMode = isDarkMode,
                 userEmail = userEmail,
                 syncStatus = syncStatus,
+                backupJson = backupJson,
+                restoreMessage = restoreMessage,
                 onToggleDarkMode = { dark ->
                     viewModel.updateProfileNameAndGoal(
                         name = userProfile?.name ?: "User",
@@ -281,11 +286,13 @@ fun AppNavHost(
                     )
                 },
                 onBackupData = {
-                    Toast.makeText(context, "Data JSON backed up successfully!", Toast.LENGTH_SHORT).show()
+                    viewModel.exportBackupJson()
                 },
-                onRestoreData = {
-                    Toast.makeText(context, "Data restored from backup!", Toast.LENGTH_SHORT).show()
+                onRestoreData = { jsonInput ->
+                    viewModel.restoreFromJson(jsonInput)
                 },
+                onClearBackupJson = { viewModel.clearBackupJson() },
+                onClearRestoreMessage = { viewModel.clearRestoreMessage() },
                 onTriggerCloudSync = {
                     viewModel.triggerCloudSync()
                     Toast.makeText(context, "Syncing data with Google Account... ☁️", Toast.LENGTH_SHORT).show()

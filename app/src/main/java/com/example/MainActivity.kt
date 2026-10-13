@@ -149,26 +149,32 @@ class MainActivity : ComponentActivity() {
                                     tasksProvider = tasksStateProvider,
                                     expensesProvider = expensesStateProvider,
                                     habitsProvider = habitsStateProvider
-                                ) {
-                                    AppNavHost(
-                                        appRouter = appRouter,
-                                        viewModel = viewModel,
-                                        userProfile = userProfile,
-                                        userStats = userStats,
-                                        userEmail = userEmail,
-                                        tasks = tasks,
-                                        habits = habits,
-                                        expenses = expenses,
-                                        latestHealth = latestHealth,
-                                        journals = journals,
-                                        notes = notes,
-                                        goals = goals,
-                                        calendarEvents = calendarEvents,
-                                        aiMessages = aiMessages,
-                                        isAiLoading = isAiLoading,
-                                        isDarkMode = isDarkMode,
-                                        context = context
-                                    )
+                                    val systemError by viewModel.systemError.collectAsState()
+
+                                    com.example.common.LifeTrackerErrorBoundary(
+                                        errorMessage = systemError,
+                                        onRetry = { viewModel.clearSystemError() }
+                                    ) {
+                                        AppNavHost(
+                                            appRouter = appRouter,
+                                            viewModel = viewModel,
+                                            userProfile = userProfile,
+                                            userStats = userStats,
+                                            userEmail = userEmail,
+                                            tasks = tasks,
+                                            habits = habits,
+                                            expenses = expenses,
+                                            latestHealth = latestHealth,
+                                            journals = journals,
+                                            notes = notes,
+                                            goals = goals,
+                                            calendarEvents = calendarEvents,
+                                            aiMessages = aiMessages,
+                                            isAiLoading = isAiLoading,
+                                            isDarkMode = isDarkMode,
+                                            context = context
+                                        )
+                                    }
 
                                     // Floating Expandable Quick Add FAB over all screens
                                     QuickAddFab(

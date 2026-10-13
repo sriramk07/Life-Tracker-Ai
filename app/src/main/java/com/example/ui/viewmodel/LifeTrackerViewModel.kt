@@ -3,60 +3,79 @@ package com.example.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.common.createViewModelExceptionHandler
 import com.example.data.local.AppDatabase
 import com.example.data.local.entities.*
 import com.example.data.remote.GeminiApiService
 import com.example.data.repository.LifeTrackerRepository
 import com.example.domain.model.AppModule
+import com.example.domain.model.GamificationProfile
+import com.example.domain.model.HunterStats
+import com.example.ui.components.HudEvent
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+/**
+ * Data model for messages exchanged in the AI Assistant chat tab.
+ *
+ * @property sender The originator of the message ("User" or "Gemini").
+ * @property text The markdown formatted chat message text.
+ * @property timestamp Epoch millisecond timestamp of message dispatch.
+ */
 data class AiChatMessage(
-    val sender: String, // "User" or "Gemini"
+    val sender: String,
     val text: String,
     val timestamp: Long = System.currentTimeMillis()
 )
 
+/**
+ * ============================================================================
+ * LIFE TRACKER VIEWMODEL — CENTRAL BUSINESS LOGIC & STATE ORCHESTRATION
+ * ============================================================================
+ *
+ * Manages unidirectional data flow (UDF) across the application:
+ * 1. Exposes reactive [StateFlow] streams for UI consumption.
+ * 2. Implements Coroutine error boundaries with [createViewModelExceptionHandler].
+ * 3. Drives gamification mechanics (Solo Leveling Hunter XP, level ups, stat allocation).
+ * 4. Coordinates cloud synchronization and full JSON backup/restore routines.
+ * 5. Formulates enriched contextual prompts for the dual-tier AI coach.
+ */
 class LifeTrackerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getDatabase(application)
     private val repository = LifeTrackerRepository(
-        db.taskDao(),
-        db.habitDao(),
-        db.expenseDao(),
-        db.healthDao(),
-        db.journalDao(),
-        db.noteDao(),
-        db.goalDao(),
-        db.calendarDao(),
-        db.userDao(),
-        db.userStatsDao(),
-        db.categoryDao(),
-        GeminiApiService()
+        taskDao = db.taskDao(),
+        habitDao = db.habitDao(),
+        expenseDao = db.expenseDao(),
+        healthDao = db.healthDao(),
+        journalDao = db.journalDao(),
+        noteDao = db.noteDao(),
+        goalDao = db.goalDao(),
+        calendarDao = db.calendarDao(),
+        userDao = db.userDao(),
+        userStatsDao = db.userStatsDao(),
+        categoryDao = db.categoryDao(),
+        geminiApiService = GeminiApiService()
     )
 
-    // Current Active Screen / Module
+    // Global Error Boundary State
+    private val _systemError = MutableStateFlow<String?>(null)
+    val systemError: StateFlow<String?> = _systemError.asStateFlow()
+
+    private val exceptionHandler = createViewModelExceptionHandler("LifeTrackerViewModel") { errorMessage ->
+        _systemError.value = errorMessage
+    }
+
+    // Current Active Navigation Destination
     private val _currentModule = MutableStateFlow(AppModule.DASHBOARD)
     val currentModule: StateFlow<AppModule> = _currentModule.asStateFlow()
 
-    // Auth State
+    // Authentication State
     private val _isLoggedIn = MutableStateFlow(true)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
     private val _userEmail = MutableStateFlow("user@gmail.com")
     val userEmail: StateFlow<String> = _userEmail.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            repository.clearFakeSeedData()
-        }
-    }
-
-    fun clearAllUserData() {
-        viewModelScope.launch {
-            repository.deleteAllUserData()
-        }
-    }
 
     // Cloud Sync State
     private val _syncStatus = MutableStateFlow("Synced") // "Idle", "Syncing", "Synced", "Error"
@@ -65,7 +84,27 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     private val _lastSyncedTimestamp = MutableStateFlow(System.currentTimeMillis())
     val lastSyncedTimestamp: StateFlow<Long> = _lastSyncedTimestamp.asStateFlow()
 
-    // Database Flows
+    // Backup & Restore Export State
+    private val _backupJsonString = MutableStateFlow<String?>(null)
+    val backupJsonString: StateFlow<String?> = _backupJsonString.asStateFlow()
+
+    private val _restoreMessage = MutableStateFlow<String?>(null)
+    val restoreMessage: StateFlow<String?> = _restoreMessage.asStateFlow()
+
+    init {
+        viewModelScope.launch(exceptionHandler) {
+            repository.clearFakeSeedData()
+        }
+    }
+
+    fun clearSystemError() {
+        _systemError.value = null
+    }
+
+    // ========================================================================
+    // DATABASE STATEFLOWS (HOT CACHED)
+    // ========================================================================
+
     val categories: StateFlow<List<CategoryEntity>> = repository.allCategories
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -102,20 +141,21 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     val userStats: StateFlow<UserStatsEntity?> = repository.userStats
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    // HUD Notification State
-    private val _hudEvent = MutableStateFlow<com.example.ui.components.HudEvent?>(null)
-    val hudEvent: StateFlow<com.example.ui.components.HudEvent?> = _hudEvent.asStateFlow()
+    // ========================================================================
+    // GAMIFICATION & SOLO LEVELING SYSTEM ENGINE
+    // ========================================================================
 
-    // Level Up Dialog State
+    private val _hudEvent = MutableStateFlow<HudEvent?>(null)
+    val hudEvent: StateFlow<HudEvent?> = _hudEvent.asStateFlow()
+
     private val _levelUpEvent = MutableStateFlow<Int?>(null)
     val levelUpEvent: StateFlow<Int?> = _levelUpEvent.asStateFlow()
 
-    // Hunter Stats State
-    private val _hunterStats = MutableStateFlow(com.example.domain.model.HunterStats())
-    val hunterStats: StateFlow<com.example.domain.model.HunterStats> = _hunterStats.asStateFlow()
+    private val _hunterStats = MutableStateFlow(HunterStats())
+    val hunterStats: StateFlow<HunterStats> = _hunterStats.asStateFlow()
 
     fun triggerHudAlert(title: String, subtitle: String, xpGained: Int = 0, isLevelUp: Boolean = false) {
-        _hudEvent.value = com.example.ui.components.HudEvent(
+        _hudEvent.value = HudEvent(
             title = title,
             subtitle = subtitle,
             xpGained = xpGained,
@@ -131,6 +171,11 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         _levelUpEvent.value = null
     }
 
+    /**
+     * Allocates an available attribute point to a chosen RPG stat.
+     *
+     * @param statName The stat code ("STR", "AGI", "INT", "VIT", "SNE").
+     */
     fun allocateStatPoint(statName: String) {
         val current = _hunterStats.value
         if (current.unallocatedPoints <= 0) return
@@ -143,16 +188,32 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             else -> current
         }
         _hunterStats.value = updated
-        triggerHudAlert("STAT POINT ALLOCATED", "$statName upgraded to ${when(statName.uppercase()) { "STR" -> updated.strength; "AGI" -> updated.agility; "INT" -> updated.intelligence; "VIT" -> updated.vitality; else -> updated.sense }}")
+        triggerHudAlert(
+            "STAT POINT ALLOCATED",
+            "$statName upgraded to ${
+                when (statName.uppercase()) {
+                    "STR" -> updated.strength
+                    "AGI" -> updated.agility
+                    "INT" -> updated.intelligence
+                    "VIT" -> updated.vitality
+                    else -> updated.sense
+                }
+            }"
+        )
     }
 
+    /**
+     * Awards RPG Experience Points (XP) for completing quests/tasks/habits.
+     * Automatically computes level progression, awards attribute points on level up,
+     * and broadcasts HUD notifications.
+     */
     fun grantXp(xpAmount: Int, actionTitle: String = "Quest Cleared") {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             val current = userStats.value ?: UserStatsEntity()
-            val previousLevel = com.example.domain.model.GamificationProfile.calculateLevel(current.totalXp)
+            val previousLevel = GamificationProfile.calculateLevel(current.totalXp)
             val newTotalXp = current.totalXp + xpAmount
-            val newLevel = com.example.domain.model.GamificationProfile.calculateLevel(newTotalXp)
-            
+            val newLevel = GamificationProfile.calculateLevel(newTotalXp)
+
             val levelUpOccurred = newLevel > previousLevel
 
             val updatedStats = current.copy(
@@ -170,7 +231,7 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
                 _levelUpEvent.value = newLevel
                 triggerHudAlert(
                     title = "LEVEL UP! REACHED LEVEL $newLevel",
-                    subtitle = com.example.domain.model.GamificationProfile.calculateLevelTitle(newLevel),
+                    subtitle = GamificationProfile.calculateLevelTitle(newLevel),
                     xpGained = xpAmount,
                     isLevelUp = true
                 )
@@ -184,7 +245,10 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // AI Assistant State
+    // ========================================================================
+    // AI ASSISTANT CHAT STATE & DISPATCH
+    // ========================================================================
+
     private val _aiChatMessages = MutableStateFlow<List<AiChatMessage>>(
         listOf(
             AiChatMessage(
@@ -198,12 +262,89 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     private val _isAiLoading = MutableStateFlow(false)
     val isAiLoading: StateFlow<Boolean> = _isAiLoading.asStateFlow()
 
-    // Navigation Action
+    fun sendMessageToAi(promptText: String) {
+        if (promptText.isBlank()) return
+
+        val userMessage = AiChatMessage(sender = "User", text = promptText)
+        _aiChatMessages.value = _aiChatMessages.value + userMessage
+        _isAiLoading.value = true
+
+        viewModelScope.launch(exceptionHandler) {
+            try {
+                val currentTasks = tasks.value.take(5).joinToString { "${it.title} (${if (it.isCompleted) "Done" else "Pending"})" }
+                val currentHabits = habits.value.joinToString { "${it.name}: ${it.streakCount} day streak" }
+                val totalExpense = expenses.value.filter { it.type == "Expense" }.sumOf { it.amount }
+                val health = latestHealthLog.value
+                val healthContext = "Water: ${health?.waterIntakeMl ?: 0}ml, Sleep: ${health?.sleepHours ?: 0f}h, Mood: ${health?.mood ?: "Good"}"
+
+                val contextualPrompt = """
+                    User Profile context:
+                    - Recent Tasks: $currentTasks
+                    - Active Habits: $currentHabits
+                    - Total Expenses Today: $$totalExpense
+                    - Health Metrics: $healthContext
+
+                    User Query: $promptText
+                """.trimIndent()
+
+                val response = repository.askGemini(contextualPrompt)
+                val aiMessage = AiChatMessage(sender = "Gemini", text = response)
+                _aiChatMessages.value = _aiChatMessages.value + aiMessage
+            } catch (e: Exception) {
+                _aiChatMessages.value = _aiChatMessages.value + AiChatMessage(
+                    sender = "Gemini",
+                    text = "⚠️ Network offline: Engaging offline coaching rules.\n• Focus on finishing pending high priority tasks.\n• Stay hydrated with 2.5L water.\n• Maintain your continuous daily streaks!"
+                )
+            } finally {
+                _isAiLoading.value = false
+            }
+        }
+    }
+
+    // ========================================================================
+    // BACKUP & RESTORE ACTIONS
+    // ========================================================================
+
+    /**
+     * Exports full system state into formatted JSON and updates [backupJsonString].
+     */
+    fun exportBackupJson() {
+        viewModelScope.launch(exceptionHandler) {
+            val json = repository.exportUserDataJson()
+            _backupJsonString.value = json
+        }
+    }
+
+    fun clearBackupJson() {
+        _backupJsonString.value = null
+    }
+
+    /**
+     * Restores application database from provided JSON string.
+     */
+    fun restoreFromJson(jsonContent: String) {
+        viewModelScope.launch(exceptionHandler) {
+            val result = repository.restoreUserDataFromJson(jsonContent)
+            if (result.isSuccess) {
+                _restoreMessage.value = "Data successfully restored from backup!"
+            } else {
+                _restoreMessage.value = "Restore failed: ${result.exceptionOrNull()?.message}"
+            }
+        }
+    }
+
+    fun clearRestoreMessage() {
+        _restoreMessage.value = null
+    }
+
+    // ========================================================================
+    // NAVIGATION & AUTHENTICATION ACTIONS
+    // ========================================================================
+
     fun navigateTo(module: AppModule) {
         _currentModule.value = module
     }
 
-    // Auth Actions
     fun login(email: String) {
         _userEmail.value = email
         _isLoggedIn.value = true
@@ -212,7 +353,7 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun triggerCloudSync() {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             _syncStatus.value = "Syncing"
             val result = repository.syncUserCloudData(_userEmail.value)
             if (result.isSuccess) {
@@ -229,22 +370,30 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         _currentModule.value = AppModule.AUTH
     }
 
-    // Category Actions
+    fun clearAllUserData() {
+        viewModelScope.launch(exceptionHandler) {
+            repository.deleteAllUserData()
+        }
+    }
+
+    // ========================================================================
+    // DOMAIN ENTITY CRUD MUTATIONS
+    // ========================================================================
+
     fun addCategory(name: String, colorHex: String = "#3B82F6", iconName: String = "Folder") {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.insertCategory(CategoryEntity(name = name, colorHex = colorHex, iconName = iconName))
         }
     }
 
     fun deleteCategory(category: CategoryEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.deleteCategory(category)
         }
     }
 
-    // Task Actions
     fun addTask(title: String, category: String, priority: String, dueDate: Long, categoryId: Long = 1L) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.insertTask(
                 TaskEntity(title = title, category = category, priority = priority, dueDate = dueDate, categoryId = categoryId)
             )
@@ -252,14 +401,14 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun toggleTaskCompletion(task: TaskEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             val newlyCompleted = !task.isCompleted
             repository.updateTask(task.copy(isCompleted = newlyCompleted))
             if (newlyCompleted) {
-                val xpGained = when (task.priority) {
-                    "High" -> 100
-                    "Medium" -> 50
-                    "Low" -> 25
+                val xpGained = when (task.priority.lowercase()) {
+                    "high" -> 100
+                    "medium" -> 50
+                    "low" -> 25
                     else -> 50
                 }
                 grantXp(xpGained, "Quest Cleared: \"${task.title}\"")
@@ -268,20 +417,19 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deleteTask(task: TaskEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.deleteTask(task)
         }
     }
 
-    // Habit Actions
     fun addHabit(name: String, category: String, frequency: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.insertHabit(HabitEntity(name = name, category = category, frequency = frequency))
         }
     }
 
     fun toggleHabitToday(habit: HabitEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             val newCompleted = !habit.isCompletedToday
             val newStreak = if (newCompleted) habit.streakCount + 1 else maxOf(0, habit.streakCount - 1)
             repository.updateHabit(
@@ -299,14 +447,13 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deleteHabit(habit: HabitEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.deleteHabit(habit)
         }
     }
 
-    // Expense Actions
     fun addExpense(title: String, amount: Double, type: String, category: String, notes: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.insertExpense(
                 ExpenseEntity(title = title, amount = amount, type = type, category = category, notes = notes)
             )
@@ -314,14 +461,13 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deleteExpense(expense: ExpenseEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.deleteExpense(expense)
         }
     }
 
-    // Health Actions
     fun addWaterIntake(amountMl: Int) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             val current = latestHealthLog.value ?: HealthLogEntity()
             val updated = current.copy(waterIntakeMl = current.waterIntakeMl + amountMl)
             repository.insertHealthLog(updated)
@@ -329,7 +475,7 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun logHealthMetrics(weightKg: Float, heightCm: Float, sleepHours: Float, steps: Int, mood: String, workoutMins: Int) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             val current = latestHealthLog.value ?: HealthLogEntity()
             val updated = current.copy(
                 weightKg = weightKg,
@@ -343,9 +489,8 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // Journal Actions
     fun addJournalEntry(title: String, content: String, moodTag: String, tags: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.insertJournal(
                 JournalEntity(title = title, content = content, moodTag = moodTag, tags = tags)
             )
@@ -353,14 +498,13 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deleteJournal(journal: JournalEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.deleteJournal(journal)
         }
     }
 
-    // Note Actions
     fun addNote(title: String, content: String, isChecklist: Boolean, folder: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.insertNote(
                 NoteEntity(title = title, content = content, isChecklist = isChecklist, folder = folder)
             )
@@ -368,20 +512,19 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun toggleNotePin(note: NoteEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.updateNote(note.copy(isPinned = !note.isPinned, updatedAt = System.currentTimeMillis()))
         }
     }
 
     fun deleteNote(note: NoteEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.deleteNote(note)
         }
     }
 
-    // Goal Actions
     fun addGoal(title: String, description: String, category: String, type: String, milestones: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.insertGoal(
                 GoalEntity(title = title, description = description, category = category, type = type, milestones = milestones)
             )
@@ -389,20 +532,19 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun updateGoalProgress(goal: GoalEntity, progress: Int) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.updateGoal(goal.copy(progressPercent = progress.coerceIn(0, 100)))
         }
     }
 
     fun deleteGoal(goal: GoalEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.deleteGoal(goal)
         }
     }
 
-    // Calendar Event Actions
     fun addCalendarEvent(title: String, description: String, startTime: Long, eventType: String, location: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.insertCalendarEvent(
                 CalendarEventEntity(title = title, description = description, startTime = startTime, eventType = eventType, location = location)
             )
@@ -410,51 +552,17 @@ class LifeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deleteCalendarEvent(event: CalendarEventEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             repository.deleteCalendarEvent(event)
         }
     }
 
-    // Settings Profile Actions
     fun updateProfileNameAndGoal(name: String, budget: Double, waterGoal: Int, darkMode: Boolean) {
-        viewModelScope.launch {
+        viewModelScope.launch(exceptionHandler) {
             val current = userProfile.value ?: UserProfileEntity()
             repository.updateProfile(
                 current.copy(name = name, monthlyBudget = budget, dailyWaterGoalMl = waterGoal, isDarkMode = darkMode)
             )
-        }
-    }
-
-    // Gemini AI Assistant Chat
-    fun sendMessageToAi(promptText: String) {
-        if (promptText.isBlank()) return
-
-        val userMessage = AiChatMessage(sender = "User", text = promptText)
-        _aiChatMessages.value = _aiChatMessages.value + userMessage
-        _isAiLoading.value = true
-
-        viewModelScope.launch {
-            // Build rich contextual context from Room database snapshot for Gemini
-            val currentTasks = tasks.value.take(5).joinToString { "${it.title} (${if (it.isCompleted) "Done" else "Pending"})" }
-            val currentHabits = habits.value.joinToString { "${it.name}: ${it.streakCount} day streak" }
-            val totalExpense = expenses.value.filter { it.type == "Expense" }.sumOf { it.amount }
-            val health = latestHealthLog.value
-            val healthContext = "Water: ${health?.waterIntakeMl ?: 0}ml, Sleep: ${health?.sleepHours ?: 0f}h, Mood: ${health?.mood ?: "Good"}"
-
-            val contextualPrompt = """
-                User Profile context:
-                - Recent Tasks: $currentTasks
-                - Active Habits: $currentHabits
-                - Total Expenses Today: $$totalExpense
-                - Health Metrics: $healthContext
-
-                User Query: $promptText
-            """.trimIndent()
-
-            val response = repository.askGemini(contextualPrompt)
-            val aiMessage = AiChatMessage(sender = "Gemini", text = response)
-            _aiChatMessages.value = _aiChatMessages.value + aiMessage
-            _isAiLoading.value = false
         }
     }
 }

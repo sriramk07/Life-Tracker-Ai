@@ -11,6 +11,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+/**
+ * ============================================================================
+ * LIFE TRACKER AI — ROOM SQLite DATABASE CONTAINER
+ * ============================================================================
+ *
+ * Central Room Database class configuring the local SQLite persistence layer.
+ * Includes 11 entity models corresponding to all app modules:
+ * - [CategoryEntity], [TaskEntity], [HabitEntity], [ExpenseEntity],
+ *   [HealthLogEntity], [JournalEntity], [NoteEntity], [GoalEntity],
+ *   [CalendarEventEntity], [UserProfileEntity], [UserStatsEntity].
+ *
+ * Thread-safe Singleton instantiation with destructive migration fallback and
+ * asynchronous database seeding on creation.
+ */
 @Database(
     entities = [
         CategoryEntity::class,
@@ -46,6 +60,12 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        /**
+         * Returns thread-safe singleton instance of [AppDatabase].
+         *
+         * @param context Application context used for Room builder initialization.
+         * @return Initialized or cached [AppDatabase] instance.
+         */
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -56,7 +76,7 @@ abstract class AppDatabase : RoomDatabase() {
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
-                        // Seed initial data asynchronously on thread
+                        // Seed foundational categories and clean user state
                         CoroutineScope(Dispatchers.IO).launch {
                             INSTANCE?.let { seedDatabase(it) }
                         }
@@ -75,6 +95,9 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Asynchronously seeds initial categories, default user profile, and level 1 hunter stats.
+         */
         private suspend fun seedDatabase(db: AppDatabase) {
             // Seed Categories
             val categories = listOf(
