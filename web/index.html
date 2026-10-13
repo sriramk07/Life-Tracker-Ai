@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeOS AI — Solo Leveling Life Tracker & Monarch System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#080c1a',
+                        cardBg: 'rgba(15, 23, 42, 0.75)',
+                        neonCyan: '#00f2fe',
+                        neonPurple: '#7c3aed',
+                        neonEmerald: '#10b981',
+                        neonCoral: '#f43f5e',
+                        neonGold: '#f59e0b'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at 15% 15%, #0d1530 0%, #050814 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .glass-panel-glow {
+            border: 1px solid rgba(0, 242, 254, 0.35);
+            box-shadow: 0 0 25px rgba(0, 242, 254, 0.15);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 9999px;
+        }
+        @keyframes float-hud {
+            0% { transform: translateY(-30px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        .animate-hud {
+            animation: float-hud 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body class="custom-scrollbar flex flex-col md:flex-row min-h-screen">
+
+    <!-- TOP FLOATING DYNAMIC ISLAND HUD NOTIFICATION -->
+    <div id="hudPill" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 hidden animate-hud">
+        <div class="glass-panel glass-panel-glow px-6 py-3 rounded-full flex items-center space-x-3 border border-cyan-500/40 shadow-2xl shadow-cyan-500/20">
+            <div id="hudIcon" class="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold">
+                <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div>
+                <div id="hudTitle" class="text-xs font-bold tracking-wider text-cyan-300 uppercase">QUEST CLEARED</div>
+                <div id="hudSubtitle" class="text-xs text-slate-300">+50 XP Gained</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LEVEL UP OVERLAY MODAL -->
+    <div id="levelUpModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass-panel glass-panel-glow max-w-md w-full rounded-3xl p-8 text-center relative border border-purple-500/50 shadow-2xl shadow-purple-500/30">
+            <div class="w-20 h-20 rounded-full bg-purple-500/20 text-purple-400 mx-auto flex items-center justify-center text-4xl mb-4 border border-purple-500/40">
+                <i class="fa-solid fa-crown"></i>
+            </div>
+            <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">LEVEL UP!</h2>
+            <div id="levelUpRank" class="text-lg font-bold text-cyan-300 mt-1 uppercase tracking-widest">S-Rank Sovereign</div>
+            <p class="text-sm text-slate-300 mt-2">You reached <span id="levelUpNumber" class="text-white font-extrabold text-lg">Level 6</span>! +3 Stat Attribute Points have been granted to your Hunter Profile.</p>
+            <div class="mt-6 flex justify-center space-x-3">
+                <button onclick="closeLevelUpModal()" class="px-6 py-2.5 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white transition shadow-lg">
+                    CLAIM & CONTINUE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="w-full md:w-64 glass-panel flex-shrink-0 flex flex-col justify-between border-r border-white/5 z-20">
+        <div>
+            <!-- Branding -->
+            <div class="p-6 flex items-center space-x-3 border-b border-white/5">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-cyan-500/25">
+                    <i class="fa-solid fa-dna"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-lg tracking-wide text-white">LifeOS AI</h1>
+                    <span class="text-[10px] uppercase font-bold tracking-widest text-cyan-400">Solo Leveling System</span>
+                </div>
+            </div>
+
+            <!-- Hunter Mini Profile -->
+            <div class="p-4 mx-4 my-3 rounded-2xl bg-white/[0.03] border border-white/5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 flex items-center justify-center text-sm font-black text-white">
+                            S
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white" id="sidebarUserName">Sriram</div>
+                            <div class="text-[10px] text-cyan-400 font-semibold" id="sidebarRankTitle">C-Rank Hunter</div>
+                        </div>
+                    </div>
+                    <span class="text-xs px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-extrabold" id="sidebarLevelBadge">Lv 5</span>
+                </div>
+                <div class="mt-3">
+                    <div class="flex justify-between text-[10px] font-semibold text-slate-400 mb-1">
+                        <span>XP Progress</span>
+                        <span id="sidebarXpRatio">450 / 500 XP</span>
+                    </div>
+                    <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div id="sidebarXpBar" class="h-full bg-gradient-to-r from-cyan-400 to-purple-500 transition-all duration-500" style="width: 90%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nav Links -->
+            <nav class="px-3 space-y-1">
+                <button onclick="switchTab('dashboard')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-cyan-400 bg-cyan-500/10" data-tab="dashboard">
+                    <i class="fa-solid fa-gauge-high w-4 text-center"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button onclick="switchTab('tasks')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="tasks">
+                    <i class="fa-solid fa-list-check w-4 text-center"></i>
+                    <span>Quests & Tasks</span>
+                </button>
+                <button onclick="switchTab('habits')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="habits">
+                    <i class="fa-solid fa-fire w-4 text-center"></i>
+                    <span>Daily Duties (Habits)</span>
+                </button>
+                <button onclick="switchTab('expenses')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="expenses">
+                    <i class="fa-solid fa-wallet w-4 text-center"></i>
+                    <span>Treasury & Expenses</span>
+                </button>
+                <button onclick="switchTab('health')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="health">
+                    <i class="fa-solid fa-heart-pulse w-4 text-center"></i>
+                    <span>Vitality & Health</span>
+                </button>
+                <button onclick="switchTab('journal')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="journal">
+                    <i class="fa-solid fa-book-bookmark w-4 text-center"></i>
+                    <span>Journal Reflections</span>
+                </button>
+                <button onclick="switchTab('notes')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="notes">
+                    <i class="fa-solid fa-note-sticky w-4 text-center"></i>
+                    <span>Notes & Checklists</span>
+                </button>
+                <button onclick="switchTab('goals')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="goals">
+                    <i class="fa-solid fa-bullseye w-4 text-center"></i>
+                    <span>Goal Roadmaps</span>
+                </button>
+                <button onclick="switchTab('calendar')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="calendar">
+                    <i class="fa-solid fa-calendar-days w-4 text-center"></i>
+                    <span>Schedule Planner</span>
+                </button>
+                <button onclick="switchTab('ai')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="ai">
+                    <i class="fa-solid fa-wand-magic-sparkles w-4 text-center text-purple-400"></i>
+                    <span>AI Coach Assistant</span>
+                </button>
+                <button onclick="switchTab('reports')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="reports">
+                    <i class="fa-solid fa-chart-pie w-4 text-center"></i>
+                    <span>Reports & Analytics</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Bottom Links -->
+        <div class="p-4 border-t border-white/5 space-y-1">
+            <button onclick="switchTab('profile')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="profile">
+                <i class="fa-solid fa-user-shield w-4 text-center"></i>
+                <span>Hunter Attributes</span>
+            </button>
+            <button onclick="switchTab('settings')" class="nav-btn w-full flex items-center space-x-3 px-4 py-2 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white hover:bg-white/5" data-tab="settings">
+                <i class="fa-solid fa-gear w-4 text-center"></i>
+                <span>Settings & Backup</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT VIEWPORT -->
+    <main class="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full custom-scrollbar">
+
+        <!-- 1. DASHBOARD TAB -->
+        <section id="tab-dashboard" class="space-y-6">
+            <!-- Header Hero -->
+            <div class="glass-panel p-6 rounded-3xl relative overflow-hidden border border-cyan-500/20">
+                <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">MONARCH SYSTEM ACTIVE</span>
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">REVIEW 2 • 75% MILESTONE</span>
+                        </div>
+                        <h2 class="text-2xl md:text-3xl font-black text-white mt-2">Welcome Back, Hunter Sriram 👋</h2>
+                        <p class="text-xs text-slate-400 mt-1">System status is optimal. You have <span class="text-cyan-400 font-bold" id="dashPendingTasksCount">3 active quests</span> pending today.</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="switchTab('ai')" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/30 flex items-center space-x-2 transition">
+                            <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i>
+                            <span>Ask AI Coach</span>
+                        </button>
+                        <button onclick="openAddTaskModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold flex items-center space-x-2 transition shadow-lg shadow-cyan-500/20">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>New Quest</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI Metric Cards Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-cyan-400">
+                    <div class="text-slate-400 text-xs font-semibold flex items-center justify-between">
+                        <span>Active Quests</span>
+                        <i class="fa-solid fa-list-check text-cyan-400"></i>
+                    </div>
+                    <div class="text-2xl font-black text-white mt-2" id="kpiTasks">3 Pending</div>
+                    <div class="text-[10px] text-cyan-400 mt-1 font-semibold">+100 XP upon completion</div>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-amber-400">
+                    <div class="text-slate-400 text-xs font-semibold flex items-center justify-between">
+                        <span>Daily Duty Streak</span>
+                        <i class="fa-solid fa-fire text-amber-400"></i>
+                    </div>
+                    <div class="text-2xl font-black text-white mt-2" id="kpiStreak">21 Days 🔥</div>
+                    <div class="text-[10px] text-amber-400 mt-1 font-semibold">Continuous duty streak</div>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-blue-400">
+                    <div class="text-slate-400 text-xs font-semibold flex items-center justify-between">
+                        <span>Hydration</span>
+                        <i class="fa-solid fa-droplet text-blue-400"></i>
+                    </div>
+                    <div class="text-2xl font-black text-white mt-2" id="kpiWater">1,750 ml</div>
+                    <div class="text-[10px] text-blue-400 mt-1 font-semibold">Goal: 2,500 ml</div>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-rose-400">
+                    <div class="text-slate-400 text-xs font-semibold flex items-center justify-between">
+                        <span>Monthly Expenses</span>
+                        <i class="fa-solid fa-wallet text-rose-400"></i>
+                    </div>
+                    <div class="text-2xl font-black text-white mt-2" id="kpiExpenses">$1,600.00</div>
+                    <div class="text-[10px] text-emerald-400 mt-1 font-semibold">Budget: $2,000 (Safe)</div>
+                </div>
+            </div>
+
+            <!-- Two-Column Digest -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Today's Priority Quests -->
+                <div class="glass-panel p-6 rounded-3xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-crosshairs text-cyan-400"></i>
+                            <span>Priority Quests</span>
+                        </h3>
+                        <button onclick="switchTab('tasks')" class="text-xs text-cyan-400 hover:underline">View All</button>
+                    </div>
+                    <div id="dashTasksList" class="space-y-2.5">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
+                <!-- Daily Duties & Hydration Quick Action -->
+                <div class="glass-panel p-6 rounded-3xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-shield-halved text-purple-400"></i>
+                            <span>Daily Habits & Hydration</span>
+                        </h3>
+                        <button onclick="switchTab('habits')" class="text-xs text-purple-400 hover:underline">Manage</button>
+                    </div>
+                    <!-- Quick Hydration -->
+                    <div class="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-between">
+                        <div>
+                            <div class="text-xs font-bold text-blue-300">Quick Water Intake 💧</div>
+                            <div class="text-[11px] text-slate-400" id="dashWaterText">1,750 / 2,500 ml logged today</div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="addWater(250)" class="px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold text-xs transition">+250ml</button>
+                            <button onclick="addWater(500)" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition">+500ml</button>
+                        </div>
+                    </div>
+                    <!-- Habits List -->
+                    <div id="dashHabitsList" class="space-y-2">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. TASKS (QUESTS) TAB -->
+        <section id="tab-tasks" class="space-y-6 hidden">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-black text-white">System Quests & Task Manager</h2>
+                    <p class="text-xs text-slate-400">Complete quests to gain XP and level up your Hunter Rank.</p>
+                </div>
+                <button onclick="openAddTaskModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center space-x-2 shadow-lg shadow-cyan-500/20">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Create Quest</span>
+                </button>
+            </div>
+
+            <!-- Search & Filters -->
+            <div class="glass-panel p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div class="relative w-full md:w-80">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    <input type="text" id="taskSearchInput" oninput="renderTasks()" placeholder="Search quests by title or category..." class="w-full bg-slate-900/60 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="flex space-x-2 w-full md:w-auto overflow-x-auto">
+                    <button onclick="setTaskFilter('priority', 'All')" class="task-pri-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30" data-val="All">All</button>
+                    <button onclick="setTaskFilter('priority', 'High')" class="task-pri-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 text-slate-400 border border-white/10" data-val="High">High (100 XP)</button>
+                    <button onclick="setTaskFilter('priority', 'Medium')" class="task-pri-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 text-slate-400 border border-white/10" data-val="Medium">Medium (50 XP)</button>
+                    <button onclick="setTaskFilter('priority', 'Low')" class="task-pri-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 text-slate-400 border border-white/10" data-val="Low">Low (25 XP)</button>
+                </div>
+            </div>
+
+            <!-- Task Items List -->
+            <div id="tasksContainer" class="space-y-3">
+                <!-- Rendered dynamically -->
+            </div>
+        </section>
+
+        <!-- 3. HABITS TAB -->
+        <section id="tab-habits" class="space-y-6 hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-black text-white">Daily Duties & Habit Conditioning</h2>
+                    <p class="text-xs text-slate-400">Maintain continuous unbroken streaks to unlock Monarch Seals.</p>
+                </div>
+                <button onclick="openAddHabitModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center space-x-2 shadow-lg shadow-amber-500/20">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>New Duty</span>
+                </button>
+            </div>
+            <div id="habitsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Rendered dynamically -->
+            </div>
+        </section>
+
+        <!-- 4. EXPENSES TAB -->
+        <section id="tab-expenses" class="space-y-6 hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-black text-white">Treasury & Expense Analytics</h2>
+                    <p class="text-xs text-slate-400">Track monthly cashflow, budgets, and spending breakdown.</p>
+                </div>
+                <button onclick="openAddExpenseModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center space-x-2 shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Log Transaction</span>
+                </button>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="glass-panel p-6 rounded-3xl">
+                    <h3 class="text-sm font-bold text-white mb-4">Category Spending Distribution</h3>
+                    <div class="h-64 flex items-center justify-center">
+                        <canvas id="expenseDonutChart"></canvas>
+                    </div>
+                </div>
+                <div class="glass-panel p-6 rounded-3xl">
+                    <h3 class="text-sm font-bold text-white mb-4">Cashflow Comparison</h3>
+                    <div class="h-64 flex items-center justify-center">
+                        <canvas id="expenseBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions List -->
+            <div class="glass-panel p-6 rounded-3xl space-y-4">
+                <h3 class="text-sm font-bold text-white">Recent Transactions</h3>
+                <div id="expensesContainer" class="space-y-3">
+                    <!-- Rendered dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. HEALTH TAB -->
+        <section id="tab-health" class="space-y-6 hidden">
+            <div>
+                <h2 class="text-2xl font-black text-white">Vitality & Biometric Tracker</h2>
+                <p class="text-xs text-slate-400">Hydration, sleep hours, workout duration, and dynamic BMI calculation.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- BMI Calculator -->
+                <div class="glass-panel p-6 rounded-3xl space-y-4">
+                    <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-calculator text-cyan-400"></i>
+                        <span>Dynamic BMI Calculator</span>
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[11px] text-slate-400 font-semibold">Weight (kg)</label>
+                            <input type="number" id="bmiWeight" value="68" oninput="calculateBmiWeb()" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-slate-400 font-semibold">Height (cm)</label>
+                            <input type="number" id="bmiHeight" value="175" oninput="calculateBmiWeb()" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                        </div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-between">
+                        <div>
+                            <div class="text-2xl font-black text-white" id="bmiValue">22.2</div>
+                            <div class="text-[11px] text-cyan-300 font-bold" id="bmiCategory">Normal Weight</div>
+                        </div>
+                        <div class="text-right text-[11px] text-slate-400 max-w-[200px]" id="bmiAdvice">
+                            Optimal healthy weight range! Maintain active routine.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sleep & Mood -->
+                <div class="glass-panel p-6 rounded-3xl space-y-4">
+                    <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-moon text-purple-400"></i>
+                        <span>Rest & Mental Check-in</span>
+                    </h3>
+                    <div>
+                        <label class="text-[11px] text-slate-400 font-semibold">Sleep Duration (Hours)</label>
+                        <input type="number" step="0.5" id="sleepHoursInput" value="7.5" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-slate-400 font-semibold">Daily Mood Valence</label>
+                        <div class="flex space-x-2 mt-2">
+                            <button onclick="setMood('⚡ Energetic')" class="mood-btn px-3 py-2 rounded-xl text-xs bg-white/5 border border-white/10 hover:border-cyan-400">⚡ Energetic</button>
+                            <button onclick="setMood('😊 Happy')" class="mood-btn px-3 py-2 rounded-xl text-xs bg-cyan-500/20 border border-cyan-500 text-cyan-300">😊 Happy</button>
+                            <button onclick="setMood('😌 Calm')" class="mood-btn px-3 py-2 rounded-xl text-xs bg-white/5 border border-white/10 hover:border-cyan-400">😌 Calm</button>
+                            <button onclick="setMood('😟 Tired')" class="mood-btn px-3 py-2 rounded-xl text-xs bg-white/5 border border-white/10 hover:border-cyan-400">😟 Tired</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. JOURNAL TAB -->
+        <section id="tab-journal" class="space-y-6 hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-black text-white">Daily Journal & Reflections</h2>
+                    <p class="text-xs text-slate-400">Capture thoughts, insights, and mental clarity.</p>
+                </div>
+                <button onclick="openAddJournalModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-purple-500 hover:bg-purple-400 text-white flex items-center space-x-2 shadow-lg shadow-purple-500/20">
+                    <i class="fa-solid fa-feather"></i>
+                    <span>Write Reflection</span>
+                </button>
+            </div>
+            <div id="journalsContainer" class="space-y-4">
+                <!-- Rendered dynamically -->
+            </div>
+        </section>
+
+        <!-- 7. NOTES TAB -->
+        <section id="tab-notes" class="space-y-6 hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-black text-white">Notes & Interactive Checklists</h2>
+                    <p class="text-xs text-slate-400">Pin important notes, study guides, and checklists.</p>
+                </div>
+                <button onclick="openAddNoteModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center space-x-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Add Note</span>
+                </button>
+            </div>
+            <div id="notesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Rendered dynamically -->
+            </div>
+        </section>
+
+        <!-- 8. GOALS TAB -->
+        <section id="tab-goals" class="space-y-6 hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-black text-white">Long-term Targets & Goal Roadmaps</h2>
+                    <p class="text-xs text-slate-400">Track career, fitness, and financial milestones with interactive sliders.</p>
+                </div>
+                <button onclick="openAddGoalModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-500 hover:bg-rose-400 text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Set Goal</span>
+                </button>
+            </div>
+            <div id="goalsContainer" class="space-y-4">
+                <!-- Rendered dynamically -->
+            </div>
+        </section>
+
+        <!-- 9. CALENDAR TAB -->
+        <section id="tab-calendar" class="space-y-6 hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-black text-white">Schedule Planner & Agenda</h2>
+                    <p class="text-xs text-slate-400">Plan events, study sessions, and workout routines.</p>
+                </div>
+                <button onclick="openAddEventModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center space-x-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Schedule Event</span>
+                </button>
+            </div>
+            <div class="glass-panel p-6 rounded-3xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-cyan-300">October 2026</h3>
+                    <span class="text-xs text-slate-400">Today: Day 13</span>
+                </div>
+                <div class="grid grid-cols-7 gap-2 text-center text-xs font-bold text-slate-400 mb-2">
+                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                </div>
+                <div id="calendarGrid" class="grid grid-cols-7 gap-2">
+                    <!-- Rendered dynamically -->
+                </div>
+            </div>
+            <div id="calendarEventsList" class="space-y-3">
+                <!-- Rendered dynamically -->
+            </div>
+        </section>
+
+        <!-- 10. AI COACH ASSISTANT TAB -->
+        <section id="tab-ai" class="space-y-6 hidden">
+            <div>
+                <h2 class="text-2xl font-black text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i>
+                    <span>Life Tracker AI Coach</span>
+                </h2>
+                <p class="text-xs text-slate-400">Powered by Google Gemini 2.5 Flash & OpenRouter AI inference engine.</p>
+            </div>
+
+            <!-- Quick Prompt Pills -->
+            <div class="flex flex-wrap gap-2">
+                <button onclick="sendQuickAiPrompt('Analyze my weekly spending against my budget')" class="px-3 py-1.5 rounded-lg text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30">💰 Analyze Spending</button>
+                <button onclick="sendQuickAiPrompt('Give me a 25-minute HIIT workout routine')" class="px-3 py-1.5 rounded-lg text-xs bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30">🏋️ 25-Min HIIT Workout</button>
+                <button onclick="sendQuickAiPrompt('How can I optimize my habit streaks this week?')" class="px-3 py-1.5 rounded-lg text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30">🔥 Optimize Habits</button>
+                <button onclick="sendQuickAiPrompt('Summarize my journal entries and mood trends')" class="px-3 py-1.5 rounded-lg text-xs bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30">📖 Summarize Journal</button>
+            </div>
+
+            <!-- Chat Message Box -->
+            <div class="glass-panel p-6 rounded-3xl h-[420px] flex flex-col justify-between">
+                <div id="aiChatBox" class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-purple-500/30 flex items-center justify-center text-purple-300 flex-shrink-0 text-xs">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-slate-800/80 text-xs text-slate-200 border border-white/5 max-w-xl leading-relaxed">
+                            Hello Hunter! 👋 I am your <strong>LifeOS AI Assistant</strong>. I am synced with your quests, habits, health logs, and expenses. How can I help optimize your performance today?
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input bar -->
+                <div class="mt-4 flex items-center space-x-2 pt-3 border-t border-white/5">
+                    <input type="text" id="aiInput" placeholder="Ask your AI coach anything..." onkeydown="if(event.key === 'Enter') sendAiMessage()" class="flex-1 bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500">
+                    <button onclick="sendAiMessage()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-bold text-xs flex items-center space-x-1.5 transition">
+                        <span>Send</span>
+                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 11. REPORTS TAB -->
+        <section id="tab-reports" class="space-y-6 hidden">
+            <div>
+                <h2 class="text-2xl font-black text-white">Performance Reports & Analytics 📊</h2>
+                <p class="text-xs text-slate-400">Comprehensive behavioral and productivity efficiency scores.</p>
+            </div>
+            <div class="glass-panel p-6 rounded-3xl">
+                <h3 class="text-sm font-bold text-white mb-4">Weekly Focus & Energy Trend</h3>
+                <div class="h-64">
+                    <canvas id="weeklyTrendChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 12. PROFILE & HUNTER ATTRIBUTES TAB -->
+        <section id="tab-profile" class="space-y-6 hidden">
+            <div>
+                <h2 class="text-2xl font-black text-cyan-300">HUNTER ATTRIBUTES & MONARCH STATS</h2>
+                <p class="text-xs text-slate-400">Allocate attribute points earned from level progression to upgrade stats.</p>
+            </div>
+
+            <!-- Stats Card -->
+            <div class="glass-panel p-6 rounded-3xl space-y-6 border border-purple-500/30">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-xs uppercase font-extrabold tracking-widest text-purple-400">UNALLOCATED ATTRIBUTE POINTS</div>
+                        <div class="text-3xl font-black text-white mt-1"><span id="unallocatedPoints">5</span> PTS</div>
+                    </div>
+                    <span class="px-3 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 font-extrabold text-xs">SYSTEM READY</span>
+                </div>
+
+                <div class="space-y-3" id="statRows">
+                    <!-- STR -->
+                    <div class="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] border border-white/5">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 font-extrabold text-xs">STR</span>
+                            <div>
+                                <div class="text-xs font-bold text-white">Strength (Workout & Physical Quests)</div>
+                                <div class="text-[10px] text-slate-400">Value: <span id="valStr" class="text-white font-bold">18</span></div>
+                            </div>
+                        </div>
+                        <button onclick="allocateStat('STR')" class="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-400 text-slate-950 font-black text-sm flex items-center justify-center transition">+</button>
+                    </div>
+                    <!-- AGI -->
+                    <div class="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] border border-white/5">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-400 font-extrabold text-xs">AGI</span>
+                            <div>
+                                <div class="text-xs font-bold text-white">Agility (Speed & Duty Streaks)</div>
+                                <div class="text-[10px] text-slate-400">Value: <span id="valAgi" class="text-white font-bold">22</span></div>
+                            </div>
+                        </div>
+                        <button onclick="allocateStat('AGI')" class="w-8 h-8 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-sm flex items-center justify-center transition">+</button>
+                    </div>
+                    <!-- INT -->
+                    <div class="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] border border-white/5">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-400 font-extrabold text-xs">INT</span>
+                            <div>
+                                <div class="text-xs font-bold text-white">Intelligence (Study & Knowledge)</div>
+                                <div class="text-[10px] text-slate-400">Value: <span id="valInt" class="text-white font-bold">25</span></div>
+                            </div>
+                        </div>
+                        <button onclick="allocateStat('INT')" class="w-8 h-8 rounded-full bg-purple-500 hover:bg-purple-400 text-slate-950 font-black text-sm flex items-center justify-center transition">+</button>
+                    </div>
+                    <!-- VIT -->
+                    <div class="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] border border-white/5">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-extrabold text-xs">VIT</span>
+                            <div>
+                                <div class="text-xs font-bold text-white">Vitality (Health & Hydration)</div>
+                                <div class="text-[10px] text-slate-400">Value: <span id="valVit" class="text-white font-bold">20</span></div>
+                            </div>
+                        </div>
+                        <button onclick="allocateStat('VIT')" class="w-8 h-8 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center transition">+</button>
+                    </div>
+                    <!-- SNE -->
+                    <div class="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.02] border border-white/5">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 font-extrabold text-xs">SNE</span>
+                            <div>
+                                <div class="text-xs font-bold text-white">Sense (Mindfulness & Focus)</div>
+                                <div class="text-[10px] text-slate-400">Value: <span id="valSne" class="text-white font-bold">19</span></div>
+                            </div>
+                        </div>
+                        <button onclick="allocateStat('SNE')" class="w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center transition">+</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 13. SETTINGS & BACKUP TAB -->
+        <section id="tab-settings" class="space-y-6 hidden">
+            <div>
+                <h2 class="text-2xl font-black text-white">Settings & Data Management</h2>
+                <p class="text-xs text-slate-400">Full JSON backup, restoration engine, and cloud sync status.</p>
+            </div>
+
+            <!-- Backup & Restore -->
+            <div class="glass-panel p-6 rounded-3xl space-y-4">
+                <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-database text-cyan-400"></i>
+                    <span>Full JSON Backup & Restore</span>
+                </h3>
+                <p class="text-xs text-slate-400">Export all local tasks, habits, expenses, health logs, and stats into formatted JSON for external backup.</p>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="exportBackupJsonWeb()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950">
+                        <i class="fa-solid fa-download mr-1"></i> Export Backup JSON
+                    </button>
+                    <button onclick="openRestoreModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white">
+                        <i class="fa-solid fa-upload mr-1"></i> Restore from JSON
+                    </button>
+                </div>
+            </div>
+
+            <!-- Reset Data -->
+            <div class="glass-panel p-6 rounded-3xl space-y-3 border border-rose-500/30">
+                <h3 class="text-sm font-bold text-rose-400">Reset Application State</h3>
+                <p class="text-xs text-slate-400">Reset your local browser database to clean defaults.</p>
+                <button onclick="resetDataWeb()" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white">
+                    Clear Data & Start Fresh
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- GENERIC MODALS -->
+
+    <!-- Add Task Modal -->
+    <div id="addTaskModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel max-w-md w-full rounded-3xl p-6 space-y-4 border border-cyan-500/30">
+            <h3 class="text-lg font-bold text-white">Create New Quest</h3>
+            <div>
+                <label class="text-[11px] text-slate-400 font-semibold">Quest Title</label>
+                <input type="text" id="modalTaskTitle" placeholder="e.g. Implement Room Database Unit Tests" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+            </div>
+            <div>
+                <label class="text-[11px] text-slate-400 font-semibold">Category</label>
+                <select id="modalTaskCategory" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                    <option value="Work">💼 Work</option>
+                    <option value="Personal">👤 Personal</option>
+                    <option value="Health">🏥 Health</option>
+                    <option value="Finance">💳 Finance</option>
+                    <option value="Study">📚 Study</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-[11px] text-slate-400 font-semibold">Priority Level (XP Reward)</label>
+                <select id="modalTaskPriority" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                    <option value="High">High (+100 XP)</option>
+                    <option value="Medium">Medium (+50 XP)</option>
+                    <option value="Low">Low (+25 XP)</option>
+                </select>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeModal('addTaskModal')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
+                <button onclick="saveNewTask()" class="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950">Add Quest</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Habit Modal -->
+    <div id="addHabitModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel max-w-md w-full rounded-3xl p-6 space-y-4 border border-amber-500/30">
+            <h3 class="text-lg font-bold text-white">Create Daily Duty</h3>
+            <div>
+                <label class="text-[11px] text-slate-400 font-semibold">Habit Name</label>
+                <input type="text" id="modalHabitName" placeholder="e.g. 20 Mins Daily Reading" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+            </div>
+            <div>
+                <label class="text-[11px] text-slate-400 font-semibold">Frequency</label>
+                <select id="modalHabitFreq" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly</option>
+                </select>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeModal('addHabitModal')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
+                <button onclick="saveNewHabit()" class="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950">Create Duty</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Expense Modal -->
+    <div id="addExpenseModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel max-w-md w-full rounded-3xl p-6 space-y-4 border border-emerald-500/30">
+            <h3 class="text-lg font-bold text-white">Log Transaction</h3>
+            <div>
+                <label class="text-[11px] text-slate-400 font-semibold">Title</label>
+                <input type="text" id="modalExpenseTitle" placeholder="e.g. Organic Groceries" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+            </div>
+            <div>
+                <label class="text-[11px] text-slate-400 font-semibold">Amount ($)</label>
+                <input type="number" id="modalExpenseAmount" placeholder="45.00" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[11px] text-slate-400 font-semibold">Type</label>
+                    <select id="modalExpenseType" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                        <option value="Expense">Expense</option>
+                        <option value="Income">Income</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[11px] text-slate-400 font-semibold">Category</label>
+                    <select id="modalExpenseCategory" class="w-full mt-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                        <option value="Food">Food</option>
+                        <option value="Bills">Bills</option>
+                        <option value="Shopping">Shopping</option>
+                        <option value="Health">Health</option>
+                        <option value="Salary">Salary</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeModal('addExpenseModal')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
+                <button onclick="saveNewExpense()" class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSON Backup View / Restore Modal -->
+    <div id="jsonModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel max-w-lg w-full rounded-3xl p-6 space-y-4 border border-cyan-500/30">
+            <h3 class="text-lg font-bold text-white" id="jsonModalTitle">Database Backup JSON</h3>
+            <textarea id="jsonModalTextarea" rows="10" class="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-xs font-mono text-cyan-300 focus:outline-none"></textarea>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeModal('jsonModal')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white">Close</button>
+                <button id="jsonModalConfirmBtn" onclick="confirmJsonRestore()" class="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950">Restore Database</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- APPLICATION SCRIPTS -->
+    <script>
+        // DEFAULT INITIAL DATA STATE
+        const defaultState = {
+            user: { name: 'Sriram', email: 'sriram@example.com' },
+            stats: { totalXp: 2450, level: 5, coins: 490, streakDays: 21, unallocatedPoints: 5, str: 18, agi: 22, int: 25, vit: 20, sne: 19 },
+            tasks: [
+                { id: 1, title: 'Complete Unit Testing Documentation', priority: 'High', category: 'Work', isCompleted: true },
+                { id: 2, title: 'Document Room Database Schema in README', priority: 'High', category: 'Work', isCompleted: true },
+                { id: 3, title: 'Integrate Error Boundary Architecture', priority: 'High', category: 'Work', isCompleted: false },
+                { id: 4, title: 'Hydrate 2.5 Liters Water Daily', priority: 'Medium', category: 'Health', isCompleted: false },
+                { id: 5, title: 'Weekly Expense Budget Review', priority: 'Low', category: 'Finance', isCompleted: false }
+            ],
+            habits: [
+                { id: 1, name: 'Morning Mindfulness & Meditation', streakCount: 21, isCompletedToday: true, category: 'Health' },
+                { id: 2, name: 'Drink 2500ml Water', streakCount: 14, isCompletedToday: false, category: 'Health' },
+                { id: 3, name: '30 Mins Daily Technical Reading', streakCount: 9, isCompletedToday: true, category: 'Learning' },
+                { id: 4, name: 'Evening Wind-down Routine', streakCount: 7, isCompletedToday: false, category: 'Health' }
+            ],
+            expenses: [
+                { id: 1, title: 'Monthly Salary', amount: 5000.0, type: 'Income', category: 'Salary', date: Date.now() - 86400000 * 5 },
+                { id: 2, title: 'Apartment Rent', amount: 1200.0, type: 'Expense', category: 'Bills', date: Date.now() - 86400000 * 4 },
+                { id: 3, title: 'Organic Groceries', amount: 250.0, type: 'Expense', category: 'Food', date: Date.now() - 86400000 * 2 },
+                { id: 4, title: 'Gym Membership', amount: 50.0, type: 'Expense', category: 'Health', date: Date.now() - 86400000 },
+                { id: 5, title: 'Dining & Coffee', amount: 100.0, type: 'Expense', category: 'Food', date: Date.now() }
+            ],
+            health: { waterIntakeMl: 1750, weightKg: 68, heightCm: 175, sleepHours: 7.5, mood: '😊 Happy' },
+            journals: [
+                { id: 1, title: 'Milestone 2 Reflection', content: 'Completed 75% project review goals with comprehensive error boundaries and testing suite.', date: 'Oct 13, 2026', mood: '⚡ Energetic' },
+                { id: 2, title: 'Habit Consistency Focus', content: 'Maintaining 21-day continuous meditation streak. Energy levels consistently high.', date: 'Oct 11, 2026', mood: '😌 Calm' }
+            ],
+            notes: [
+                { id: 1, title: 'Architecture Deliverables', content: 'Room DB 11 tables • Dual-engine AI • Error Boundaries • Full JSON Backup', isPinned: true },
+                { id: 2, title: 'Weekly Workout Splits', content: 'Mon: HIIT Cardio • Wed: Core & Strength • Fri: Endurance & Mobility', isPinned: false }
+            ],
+            goals: [
+                { id: 1, title: 'Deliver 75% LifeOS AI Review', progress: 75, category: 'Career' },
+                { id: 2, title: 'Maintain 30-Day Duty Streak', progress: 70, category: 'Habits' }
+            ]
+        };
+
+        let appState = JSON.parse(localStorage.getItem('lifeos_ai_state')) || defaultState;
+
+        function saveState() {
+            localStorage.setItem('lifeos_ai_state', JSON.stringify(appState));
+            updateGamificationUI();
+        }
+
+        // NAVIGATION SWITCHER
+        function switchTab(tabId) {
+            document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
+            const target = document.getElementById(`tab-${tabId}`);
+            if (target) target.classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-cyan-400', 'bg-cyan-500/10');
+                btn.classList.add('text-slate-400');
+            });
+            const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-slate-400');
+                activeBtn.classList.add('text-cyan-400', 'bg-cyan-500/10');
+            }
+
+            if (tabId === 'expenses') renderCharts();
+            if (tabId === 'reports') renderReportsChart();
+            if (tabId === 'calendar') renderCalendar();
+        }
+
+        // HUD NOTIFICATION ENGINE
+        function triggerHud(title, subtitle, iconHtml = '<i class="fa-solid fa-bolt"></i>') {
+            const hud = document.getElementById('hudPill');
+            document.getElementById('hudTitle').innerText = title;
+            document.getElementById('hudSubtitle').innerText = subtitle;
+            document.getElementById('hudIcon').innerHTML = iconHtml;
+            hud.classList.remove('hidden');
+            setTimeout(() => { hud.classList.add('hidden'); }, 3000);
+        }
+
+        // GAMIFICATION CALCULATIONS & RANKS
+        function getRankTitle(level) {
+            if (level < 3) return "E-Rank Hunter";
+            if (level < 6) return "C-Rank Hunter";
+            if (level < 10) return "B-Rank Hunter";
+            if (level < 15) return "A-Rank Hunter";
+            if (level < 25) return "S-Rank Sovereign";
+            return "Shadow Monarch";
+        }
+
+        function grantXp(amount, actionTitle) {
+            const previousLevel = Math.floor(appState.stats.totalXp / 500) + 1;
+            appState.stats.totalXp += amount;
+            const newLevel = Math.floor(appState.stats.totalXp / 500) + 1;
+
+            if (newLevel > previousLevel) {
+                appState.stats.level = newLevel;
+                appState.stats.unallocatedPoints += 3;
+                showLevelUp(newLevel);
+            } else {
+                triggerHud(actionTitle, `+${amount} XP Gained for System Progress`);
+            }
+            saveState();
+        }
+
+        function showLevelUp(newLevel) {
+            document.getElementById('levelUpNumber').innerText = `Level ${newLevel}`;
+            document.getElementById('levelUpRank').innerText = getRankTitle(newLevel);
+            document.getElementById('levelUpModal').classList.remove('hidden');
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
+
+        function closeLevelUpModal() {
+            document.getElementById('levelUpModal').classList.add('hidden');
+        }
+
+        function updateGamificationUI() {
+            const s = appState.stats;
+            const currentLevel = Math.floor(s.totalXp / 500) + 1;
+            const xpInLevel = s.totalXp % 500;
+            const pct = Math.min(100, (xpInLevel / 500) * 100);
+
+            document.getElementById('sidebarLevelBadge').innerText = `Lv ${currentLevel}`;
+            document.getElementById('sidebarRankTitle').innerText = getRankTitle(currentLevel);
+            document.getElementById('sidebarXpRatio').innerText = `${xpInLevel} / 500 XP`;
+            document.getElementById('sidebarXpBar').style.width = `${pct}%`;
+
+            document.getElementById('unallocatedPoints').innerText = s.unallocatedPoints;
+            document.getElementById('valStr').innerText = s.str;
+            document.getElementById('valAgi').innerText = s.agi;
+            document.getElementById('valInt').innerText = s.int;
+            document.getElementById('valVit').innerText = s.vit;
+            document.getElementById('valSne').innerText = s.sne;
+        }
+
+        function allocateStat(code) {
+            if (appState.stats.unallocatedPoints <= 0) {
+                alert("No unallocated points remaining! Complete quests to level up.");
+                return;
+            }
+            appState.stats.unallocatedPoints--;
+            if (code === 'STR') appState.stats.str++;
+            if (code === 'AGI') appState.stats.agi++;
+            if (code === 'INT') appState.stats.int++;
+            if (code === 'VIT') appState.stats.vit++;
+            if (code === 'SNE') appState.stats.sne++;
+
+            triggerHud("STAT UPGRADE", `${code} increased by +1!`);
+            saveState();
+        }
+
+        // TASKS LOGIC
+        let taskPriorityFilter = 'All';
+        function setTaskFilter(type, val) {
+            taskPriorityFilter = val;
+            document.querySelectorAll('.task-pri-btn').forEach(btn => {
+                if (btn.getAttribute('data-val') === val) {
+                    btn.className = "task-pri-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30";
+                } else {
+                    btn.className = "task-pri-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 text-slate-400 border border-white/10";
+                }
+            });
+            renderTasks();
+        }
+
+        function renderTasks() {
+            const query = (document.getElementById('taskSearchInput')?.value || '').toLowerCase();
+            const filtered = appState.tasks.filter(t => {
+                const matchPri = (taskPriorityFilter === 'All') || (t.priority === taskPriorityFilter);
+                const matchQuery = t.title.toLowerCase().includes(query) || t.category.toLowerCase().includes(query);
+                return matchPri && matchQuery;
+            });
+
+            const container = document.getElementById('tasksContainer');
+            if (!container) return;
+            container.innerHTML = filtered.map(t => `
+                <div class="glass-panel p-4 rounded-2xl flex items-center justify-between transition hover:border-cyan-500/30">
+                    <div class="flex items-center space-x-3.5">
+                        <input type="checkbox" ${t.isCompleted ? 'checked' : ''} onchange="toggleTask(${t.id})" class="w-5 h-5 rounded-md bg-slate-800 border-white/20 text-cyan-500 focus:ring-0 cursor-pointer">
+                        <div>
+                            <div class="text-xs font-bold ${t.isCompleted ? 'line-through text-slate-500' : 'text-white'}">${t.title}</div>
+                            <div class="flex items-center space-x-2 mt-1">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${t.priority === 'High' ? 'bg-rose-500/20 text-rose-300' : t.priority === 'Medium' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}">${t.priority}</span>
+                                <span class="text-[10px] text-slate-400">${t.category}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="deleteTask(${t.id})" class="text-slate-500 hover:text-rose-400 text-xs p-2"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `).join('') || '<div class="text-center text-xs text-slate-500 py-8">No matching quests found.</div>';
+
+            renderDashTasks();
+        }
+
+        function toggleTask(id) {
+            const task = appState.tasks.find(t => t.id === id);
+            if (!task) return;
+            task.isCompleted = !task.isCompleted;
+            if (task.isCompleted) {
+                confetti({ particleCount: 40, spread: 60, origin: { y: 0.7 } });
+                const xp = task.priority === 'High' ? 100 : task.priority === 'Medium' ? 50 : 25;
+                grantXp(xp, `Quest Cleared: "${task.title}"`);
+            }
+            saveState();
+            renderTasks();
+        }
+
+        function deleteTask(id) {
+            appState.tasks = appState.tasks.filter(t => t.id !== id);
+            saveState();
+            renderTasks();
+        }
+
+        function openAddTaskModal() { document.getElementById('addTaskModal').classList.remove('hidden'); }
+        function saveNewTask() {
+            const title = document.getElementById('modalTaskTitle').value.trim();
+            const category = document.getElementById('modalTaskCategory').value;
+            const priority = document.getElementById('modalTaskPriority').value;
+            if (!title) return;
+            appState.tasks.push({ id: Date.now(), title, category, priority, isCompleted: false });
+            document.getElementById('modalTaskTitle').value = '';
+            closeModal('addTaskModal');
+            saveState();
+            renderTasks();
+        }
+
+        // HABITS LOGIC
+        function renderHabits() {
+            const container = document.getElementById('habitsContainer');
+            if (!container) return;
+            container.innerHTML = appState.habits.map(h => `
+                <div class="glass-panel p-5 rounded-2xl flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg font-bold">
+                            <i class="fa-solid fa-fire"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white">${h.name}</div>
+                            <div class="text-[11px] text-amber-300 font-semibold mt-0.5">${h.streakCount} Day Streak 🔥 • ${h.category}</div>
+                        </div>
+                    </div>
+                    <button onclick="toggleHabit(${h.id})" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${h.isCompletedToday ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10'}">
+                        ${h.isCompletedToday ? '✓ Done' : 'Check'}
+                    </button>
+                </div>
+            `).join('');
+            renderDashHabits();
+        }
+
+        function toggleHabit(id) {
+            const habit = appState.habits.find(h => h.id === id);
+            if (!habit) return;
+            habit.isCompletedToday = !habit.isCompletedToday;
+            if (habit.isCompletedToday) {
+                habit.streakCount++;
+                grantXp(50 + (habit.streakCount * 5), `Duty Cleared: "${habit.name}"`);
+            } else {
+                habit.streakCount = Math.max(0, habit.streakCount - 1);
+            }
+            saveState();
+            renderHabits();
+        }
+
+        function openAddHabitModal() { document.getElementById('addHabitModal').classList.remove('hidden'); }
+        function saveNewHabit() {
+            const name = document.getElementById('modalHabitName').value.trim();
+            const freq = document.getElementById('modalHabitFreq').value;
+            if (!name) return;
+            appState.habits.push({ id: Date.now(), name, streakCount: 0, isCompletedToday: false, category: 'Personal' });
+            document.getElementById('modalHabitName').value = '';
+            closeModal('addHabitModal');
+            saveState();
+            renderHabits();
+        }
+
+        // EXPENSES LOGIC & CHARTS
+        let donutChartInstance = null;
+        let barChartInstance = null;
+
+        function renderExpenses() {
+            const container = document.getElementById('expensesContainer');
+            if (!container) return;
+            container.innerHTML = appState.expenses.map(e => `
+                <div class="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-white">${e.title}</div>
+                        <div class="text-[10px] text-slate-400">${e.category} • ${e.type}</div>
+                    </div>
+                    <div class="text-xs font-extrabold ${e.type === 'Income' ? 'text-emerald-400' : 'text-rose-400'}">
+                        ${e.type === 'Income' ? '+' : '-'}$${e.amount.toFixed(2)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderCharts() {
+            renderExpenses();
+            const ctxDonut = document.getElementById('expenseDonutChart');
+            const ctxBar = document.getElementById('expenseBarChart');
+            if (!ctxDonut || !ctxBar) return;
+
+            // Group by category
+            const categories = {};
+            appState.expenses.filter(e => e.type === 'Expense').forEach(e => {
+                categories[e.category] = (categories[e.category] || 0) + e.amount;
+            });
+
+            if (donutChartInstance) donutChartInstance.destroy();
+            donutChartInstance = new Chart(ctxDonut, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(categories),
+                    datasets: [{
+                        data: Object.values(categories),
+                        backgroundColor: ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 } } } }
+                }
+            });
+
+            if (barChartInstance) barChartInstance.destroy();
+            const inc = appState.expenses.filter(e => e.type === 'Income').reduce((a, b) => a + b.amount, 0);
+            const exp = appState.expenses.filter(e => e.type === 'Expense').reduce((a, b) => a + b.amount, 0);
+
+            barChartInstance = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: ['Income', 'Expense'],
+                    datasets: [{
+                        label: 'Cashflow ($)',
+                        data: [inc, exp],
+                        backgroundColor: ['#10b981', '#f43f5e'],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+        }
+
+        function openAddExpenseModal() { document.getElementById('addExpenseModal').classList.remove('hidden'); }
+        function saveNewExpense() {
+            const title = document.getElementById('modalExpenseTitle').value.trim();
+            const amount = parseFloat(document.getElementById('modalExpenseAmount').value);
+            const type = document.getElementById('modalExpenseType').value;
+            const category = document.getElementById('modalExpenseCategory').value;
+            if (!title || isNaN(amount) || amount <= 0) return;
+            appState.expenses.push({ id: Date.now(), title, amount, type, category, date: Date.now() });
+            closeModal('addExpenseModal');
+            saveState();
+            renderCharts();
+        }
+
+        // HEALTH & BMI LOGIC
+        function addWater(amount) {
+            appState.health.waterIntakeMl += amount;
+            triggerHud("HYDRATION LOGGED", `+${amount}ml water logged! Current: ${appState.health.waterIntakeMl}ml`);
+            saveState();
+            updateDashboardMetrics();
+        }
+
+        function calculateBmiWeb() {
+            const w = parseFloat(document.getElementById('bmiWeight').value);
+            const h = parseFloat(document.getElementById('bmiHeight').value);
+            if (!w || !h || h <= 0) return;
+            const bmi = (w / ((h / 100) * (h / 100))).toFixed(1);
+            document.getElementById('bmiValue').innerText = bmi;
+            let cat = "Normal Weight";
+            let adv = "Optimal healthy weight range! Maintain active routine.";
+            if (bmi < 18.5) { cat = "Underweight"; adv = "Consider balanced caloric and strength conditioning."; }
+            else if (bmi >= 25 && bmi < 30) { cat = "Overweight"; adv = "Incorporate daily cardio and portion monitoring."; }
+            else if (bmi >= 30) { cat = "Obese"; adv = "Consult structured fitness guidelines."; }
+
+            document.getElementById('bmiCategory').innerText = cat;
+            document.getElementById('bmiAdvice').innerText = adv;
+        }
+
+        function setMood(m) {
+            appState.health.mood = m;
+            document.querySelectorAll('.mood-btn').forEach(btn => {
+                if (btn.innerText.includes(m)) {
+                    btn.className = "mood-btn px-3 py-2 rounded-xl text-xs bg-cyan-500/20 border border-cyan-500 text-cyan-300";
+                } else {
+                    btn.className = "mood-btn px-3 py-2 rounded-xl text-xs bg-white/5 border border-white/10 hover:border-cyan-400";
+                }
+            });
+            triggerHud("MOOD LOGGED", `Current state: ${m}`);
+            saveState();
+        }
+
+        // DASHBOARD HELPERS
+        function updateDashboardMetrics() {
+            const pendingTasks = appState.tasks.filter(t => !t.isCompleted).length;
+            document.getElementById('dashPendingTasksCount').innerText = `${pendingTasks} active quests`;
+            document.getElementById('kpiTasks').innerText = `${pendingTasks} Pending`;
+            document.getElementById('kpiWater').innerText = `${appState.health.waterIntakeMl.toLocaleString()} ml`;
+            document.getElementById('dashWaterText').innerText = `${appState.health.waterIntakeMl.toLocaleString()} / 2,500 ml logged today`;
+
+            const totalExp = appState.expenses.filter(e => e.type === 'Expense').reduce((a, b) => a + b.amount, 0);
+            document.getElementById('kpiExpenses').innerText = `$${totalExp.toFixed(2)}`;
+        }
+
+        function renderDashTasks() {
+            const container = document.getElementById('dashTasksList');
+            if (!container) return;
+            const topTasks = appState.tasks.filter(t => !t.isCompleted).slice(0, 3);
+            container.innerHTML = topTasks.map(t => `
+                <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between">
+                    <span class="text-xs text-white font-medium">${t.title}</span>
+                    <button onclick="toggleTask(${t.id})" class="text-[10px] px-2.5 py-1 rounded bg-cyan-500/20 text-cyan-300 font-bold hover:bg-cyan-500/30">Complete</button>
+                </div>
+            `).join('') || '<div class="text-xs text-slate-500 py-3">All quests completed! Great job!</div>';
+            updateDashboardMetrics();
+        }
+
+        function renderDashHabits() {
+            const container = document.getElementById('dashHabitsList');
+            if (!container) return;
+            container.innerHTML = appState.habits.slice(0, 3).map(h => `
+                <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between">
+                    <span class="text-xs text-white font-medium">${h.name}</span>
+                    <button onclick="toggleHabit(${h.id})" class="text-[10px] px-2.5 py-1 rounded ${h.isCompletedToday ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-slate-400'} font-bold">
+                        ${h.isCompletedToday ? '✓ Done' : 'Check'}
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // AI COACH SIMULATION
+        function sendQuickAiPrompt(text) {
+            document.getElementById('aiInput').value = text;
+            sendAiMessage();
+        }
+
+        function sendAiMessage() {
+            const input = document.getElementById('aiInput');
+            const prompt = input.value.trim();
+            if (!prompt) return;
+
+            const chatBox = document.getElementById('aiChatBox');
+            chatBox.innerHTML += `
+                <div class="flex items-start space-x-3 justify-end">
+                    <div class="p-3.5 rounded-2xl bg-cyan-500 text-slate-950 text-xs font-semibold max-w-xl leading-relaxed">
+                        ${prompt}
+                    </div>
+                </div>
+            `;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Generate intelligent AI response based on appState
+            setTimeout(() => {
+                let response = "";
+                const p = prompt.toLowerCase();
+                if (p.includes('workout') || p.includes('exercise')) {
+                    response = `🏋️ <strong>Suggested High-Energy Routine:</strong><br>• 5 min dynamic warmup (Jumping jacks, Arm circles)<br>• 15 min Bodyweight circuit: 3x 15 Squats, 10 Pushups, 45s Plank<br>• 5 min deep stretch & cooldown.<br><em>Tip: Drink 500ml water post-workout!</em>`;
+                } else if (p.includes('spend') || p.includes('budget')) {
+                    const totalExp = appState.expenses.filter(e => e.type === 'Expense').reduce((a, b) => a + b.amount, 0);
+                    response = `💰 <strong>Financial Digest:</strong><br>• Total logged expenses: <strong>$${totalExp.toFixed(2)}</strong>.<br>• Monthly target: $2,000.00.<br>• Status: ✅ Within safe thresholds. Keep logging daily coffee & snacks to prevent budget drift!`;
+                } else if (p.includes('habit') || p.includes('streak')) {
+                    response = `🔥 <strong>Duty Streak Optimization:</strong><br>• You currently hold an impressive 21-day continuous streak.<br>• Anchor habits to existing routines (e.g., meditate immediately after morning water).<br>• Each completed duty earns you +50 XP toward your next level!`;
+                } else {
+                    response = `✨ <strong>AI Life Optimization:</strong><br>• Review your high-priority quests and complete them in 25-minute Pomodoro intervals.<br>• Stay focused on your water target (2,500ml).<br>• Good luck on reaching your next Hunter Level!`;
+                }
+
+                chatBox.innerHTML += `
+                    <div class="flex items-start space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-purple-500/30 flex items-center justify-center text-purple-300 flex-shrink-0 text-xs">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-slate-800/80 text-xs text-slate-200 border border-white/5 max-w-xl leading-relaxed">
+                            ${response}
+                        </div>
+                    </div>
+                `;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }, 600);
+        }
+
+        // BACKUP & RESTORE
+        function exportBackupJsonWeb() {
+            const jsonStr = JSON.stringify(appState, null, 2);
+            document.getElementById('jsonModalTitle').innerText = "Database Backup JSON";
+            document.getElementById('jsonModalTextarea').value = jsonStr;
+            document.getElementById('jsonModalConfirmBtn').classList.add('hidden');
+            document.getElementById('jsonModal').classList.remove('hidden');
+        }
+
+        function openRestoreModal() {
+            document.getElementById('jsonModalTitle').innerText = "Paste Backup JSON to Restore";
+            document.getElementById('jsonModalTextarea').value = "";
+            document.getElementById('jsonModalConfirmBtn').classList.remove('hidden');
+            document.getElementById('jsonModal').classList.remove('hidden');
+        }
+
+        function confirmJsonRestore() {
+            try {
+                const text = document.getElementById('jsonModalTextarea').value;
+                const parsed = JSON.parse(text);
+                appState = parsed;
+                saveState();
+                closeModal('jsonModal');
+                alert("Database successfully restored from backup!");
+                location.reload();
+            } catch(e) {
+                alert("Failed to parse JSON backup: " + e.message);
+            }
+        }
+
+        function resetDataWeb() {
+            if (confirm("Are you sure you want to reset all data to clean defaults?")) {
+                localStorage.removeItem('lifeos_ai_state');
+                appState = defaultState;
+                saveState();
+                location.reload();
+            }
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        // CALENDAR RENDER
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            if (!grid) return;
+            let html = '';
+            for (let i = 1; i <= 31; i++) {
+                const isToday = i === 13;
+                html += `
+                    <div class="h-10 rounded-xl flex items-center justify-center text-xs font-bold ${isToday ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/30' : 'bg-white/[0.02] text-slate-300 hover:bg-white/5'}">
+                        ${i}
+                    </div>
+                `;
+            }
+            grid.innerHTML = html;
+        }
+
+        // REPORTS CHART
+        let trendChartInstance = null;
+        function renderReportsChart() {
+            const ctx = document.getElementById('weeklyTrendChart');
+            if (!ctx) return;
+            if (trendChartInstance) trendChartInstance.destroy();
+            trendChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'Productivity Efficiency (%)',
+                        data: [72, 85, 80, 94, 88, 76, 95],
+                        borderColor: '#00f2fe',
+                        backgroundColor: 'rgba(0, 242, 254, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+        }
+
+        // INITIALIZE APP
+        window.addEventListener('DOMContentLoaded', () => {
+            saveState();
+            renderTasks();
+            renderHabits();
+            calculateBmiWeb();
+        });
+    </script>
+</body>
+</html>
