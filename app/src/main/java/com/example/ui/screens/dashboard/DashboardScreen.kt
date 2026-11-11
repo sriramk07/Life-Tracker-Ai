@@ -293,7 +293,15 @@ fun DashboardScreen(
                     profile = com.example.domain.model.GamificationProfile(
                         totalXp = stats.totalXp,
                         coins = stats.coins,
-                        streakDays = habitStreakDays
+                        streakDays = habitStreakDays,
+                        stats = com.example.domain.model.HunterStats(
+                            strength = stats.strength,
+                            agility = stats.agility,
+                            intelligence = stats.intelligence,
+                            vitality = stats.vitality,
+                            sense = stats.sense,
+                            unallocatedPoints = stats.unallocatedPoints
+                        )
                     ),
                     onViewAllBadges = { onNavigate(AppModule.PROFILE) }
                 )

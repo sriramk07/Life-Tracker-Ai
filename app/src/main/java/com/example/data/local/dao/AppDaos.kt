@@ -6,10 +6,10 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * ============================================================================
- * LIFE TRACKER AI — ROOM DATA ACCESS OBJECTS (DAOs)
+ * LIFE TRACKER AI — ROOM DATA ACCESS OBJECTS (DAOs) — V4
  * ============================================================================
  *
- * Provides reactive [Flow] and suspending query methods for all 11 database entities.
+ * Provides reactive [Flow] and suspending query methods for all 12 database entities.
  * Implements ConflictStrategy.REPLACE for resilient upsert mechanics.
  */
 
@@ -108,7 +108,7 @@ interface ExpenseDao {
 }
 
 /**
- * Data Access Object for health metrics, hydration, and sleep logs.
+ * Data Access Object for health metrics, hydration, sleep, and sensor steps.
  */
 @Dao
 interface HealthDao {
@@ -276,6 +276,10 @@ interface CategoryDao {
     @Query("SELECT * FROM categories ORDER BY name ASC")
     fun getAllCategories(): Flow<List<CategoryEntity>>
 
+    /** One-shot snapshot of categories. */
+    @Query("SELECT * FROM categories ORDER BY name ASC")
+    suspend fun getAllCategoriesList(): List<CategoryEntity>
+
     /** Inserts or replaces a category. */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCategory(category: CategoryEntity): Long
@@ -301,4 +305,22 @@ interface UserStatsDao {
     /** Upserts the singleton gamification stats record. */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateUserStats(stats: UserStatsEntity)
+}
+
+/**
+ * Data Access Object for collaborative Social Guild raid progression.
+ */
+@Dao
+interface GuildProgressDao {
+    /** Reactive stream observing singleton guild progression (ID = 1). */
+    @Query("SELECT * FROM guild_progress WHERE id = 1")
+    fun getGuildProgress(): Flow<GuildProgressEntity?>
+
+    /** One-shot retrieval of guild progression. */
+    @Query("SELECT * FROM guild_progress WHERE id = 1")
+    suspend fun getGuildProgressSingle(): GuildProgressEntity?
+
+    /** Upserts singleton guild progression record. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateGuildProgress(progress: GuildProgressEntity)
 }

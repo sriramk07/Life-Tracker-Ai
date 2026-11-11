@@ -12,6 +12,7 @@ enum class AppModule(val title: String) {
     CALENDAR("Calendar"),
     AI_ASSISTANT("AI Assistant"),
     REPORTS("Reports & Analytics"),
+    GUILDS("Hunter Guilds"),
     SETTINGS("Settings"),
     PROFILE("Profile"),
     AUTH("Authentication")

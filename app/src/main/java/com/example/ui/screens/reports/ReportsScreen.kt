@@ -1,30 +1,85 @@
 package com.example.ui.screens.reports
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.local.entities.ExpenseEntity
+import com.example.data.local.entities.HabitEntity
+import com.example.data.local.entities.HealthLogEntity
+import com.example.data.local.entities.TaskEntity
+import com.example.export.LifeReportSnapshot
+import com.example.export.ReportExportEngine
 import com.example.ui.components.*
+import java.util.Locale
 
+/**
+ * ============================================================================
+ * REPORTS & ANALYTICS SCREEN (RELEASE 1.0 — LIVE METRICS + PDF/CSV EXPORT)
+ * ============================================================================
+ *
+ * Aggregates live Room data into interactive charts and supports exporting
+ * formatted PDF documents, RFC-4180 CSV ledgers, and clipboard digests.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(
-    taskCount: Int,
-    expenseTotal: Double,
-    habitStreakMax: Int,
-    waterIntakeAverage: Int
+    tasks: List<TaskEntity> = emptyList(),
+    habits: List<HabitEntity> = emptyList(),
+    expenses: List<ExpenseEntity> = emptyList(),
+    latestHealth: HealthLogEntity? = null,
+    userName: String = "Hunter",
+    level: Int = 1,
+    totalXp: Int = 0
 ) {
+    val context = LocalContext.current
     var selectedTimeframe by remember { mutableStateOf("Weekly") }
     var showExportDialog by remember { mutableStateOf(false) }
+
+    val completedTaskCount = tasks.count { it.isCompleted }
+    val expenseTotal = expenses.filter { it.type.equals("Expense", true) }.sumOf { it.amount }
+    val habitStreakMax = habits.maxOfOrNull { it.streakCount } ?: 0
+    val waterIntakeMl = latestHealth?.waterIntakeMl ?: 0
+
+    val efficiencyScore = remember(tasks, habits, waterIntakeMl) {
+        ReportExportEngine.calculateEfficiencyScore(tasks, habits, waterIntakeMl)
+    }
+    val weeklyTrend = remember(tasks, habits) {
+        ReportExportEngine.computeWeeklyFocusTrend(tasks, habits)
+    }
+    val expenseSlices = remember(expenses) {
+        ReportExportEngine.computeExpenseSlices(expenses)
+    }
+
+    val snapshot = remember(userName, selectedTimeframe, tasks, habits, expenses, latestHealth, level, totalXp) {
+        LifeReportSnapshot(
+            userName = userName,
+            timeframe = selectedTimeframe,
+            tasks = tasks,
+            habits = habits,
+            expenses = expenses,
+            latestHealth = latestHealth,
+            level = level,
+            totalXp = totalXp
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -40,7 +95,7 @@ fun ReportsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Reports & Analytics 📊",
                         fontSize = 24.sp,
@@ -48,7 +103,7 @@ fun ReportsScreen(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "Comprehensive performance & behavioral insights",
+                        text = "Live database intelligence & PDF / CSV export studio",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -75,7 +130,7 @@ fun ReportsScreen(
             }
         }
 
-        // Circular Gauge KPI Card
+        // Dynamic Circular Gauge KPI Card
         item {
             GlassmorphicCard {
                 Row(
@@ -86,13 +141,13 @@ fun ReportsScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("$selectedTimeframe Efficiency Score", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("• $taskCount Tasks completed", fontSize = 12.sp, color = Color(0xFF1E88E5))
-                        Text("• $$expenseTotal total logged expenses", fontSize = 12.sp, color = Color(0xFFFB8C00))
+                        Text("• $completedTaskCount/${tasks.size} Quests completed", fontSize = 12.sp, color = Color(0xFF1E88E5))
+                        Text("• $${String.format(Locale.US, "%.2f", expenseTotal)} total logged expenses", fontSize = 12.sp, color = Color(0xFFFB8C00))
                         Text("• $habitStreakMax days top habit streak", fontSize = 12.sp, color = Color(0xFF43A047))
                     }
 
                     CircularProgressGauge(
-                        progressPercent = 84,
+                        progressPercent = efficiencyScore,
                         activeColor = Color(0xFF1E88E5),
                         modifier = Modifier.size(90.dp)
                     )
@@ -100,54 +155,49 @@ fun ReportsScreen(
             }
         }
 
-        // Weekly Line Chart
+        // Live Weekly Trend Chart
         item {
             GlassmorphicCard {
-                Text("Weekly Focus & Energy Trend Line", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Focus & Execution Trend Line", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Spacer(modifier = Modifier.height(12.dp))
-
-                val sampleLineData = listOf(
-                    "Mon" to 65f,
-                    "Tue" to 82f,
-                    "Wed" to 78f,
-                    "Thu" to 92f,
-                    "Fri" to 88f,
-                    "Sat" to 70f,
-                    "Sun" to 95f
-                )
-
-                WeeklyLineChart(dataPoints = sampleLineData, lineColor = Color(0xFF1E88E5))
+                WeeklyLineChart(dataPoints = weeklyTrend, lineColor = Color(0xFF1E88E5))
             }
         }
 
-        // Expense Pie Chart & Breakdown
+        // Real Expense Pie Chart & Breakdown
         item {
             GlassmorphicCard {
                 Text("Expense Distribution Breakdown", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    CustomPieChart(
-                        slices = listOf(
-                            PieChartSlice("Food", 450.0, Color(0xFFFB8C00)),
-                            PieChartSlice("Bills", 1200.0, Color(0xFFE53935)),
-                            PieChartSlice("Shopping", 350.0, Color(0xFF8E24AA)),
-                            PieChartSlice("Health", 250.0, Color(0xFF43A047))
-                        ),
-                        modifier = Modifier.size(130.dp)
+                if (expenseSlices.isEmpty()) {
+                    Text(
+                        text = "No expense records logged yet. Log expenses in Treasury to view live category breakdowns.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        CustomPieChart(
+                            slices = expenseSlices,
+                            modifier = Modifier.size(130.dp)
+                        )
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
 
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        LegendItem("Bills & Utilities", "$1,200", Color(0xFFE53935))
-                        LegendItem("Food & Dining", "$450", Color(0xFFFB8C00))
-                        LegendItem("Shopping", "$350", Color(0xFF8E24AA))
-                        LegendItem("Health & Wellness", "$250", Color(0xFF43A047))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            expenseSlices.take(5).forEach { slice ->
+                                LegendItem(
+                                    label = slice.category,
+                                    value = "$${String.format(Locale.US, "%.0f", slice.value)}",
+                                    color = slice.color
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -164,19 +214,57 @@ fun ReportsScreen(
     if (showExportDialog) {
         AlertDialog(
             onDismissRequest = { showExportDialog = false },
-            title = { Text("Export Analytics Summary") },
+            title = { Text("Export Report Studio") },
             text = {
-                Text("Your $selectedTimeframe Life Report has been generated cleanly as a text summary. You can copy or save it to your records.")
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Export your $selectedTimeframe LifeOS data cleanly to shareable files:")
+
+                    Button(
+                        onClick = {
+                            val pdfFile = ReportExportEngine.writePdfReportToCache(context, snapshot)
+                            ReportExportEngine.shareGeneratedFile(context, pdfFile, "application/pdf")
+                            Toast.makeText(context, "PDF generated: ${pdfFile.name}", Toast.LENGTH_SHORT).show()
+                            showExportDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("export_pdf_btn")
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Export & Share Vector PDF")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val csvFile = ReportExportEngine.writeCsvReportToCache(context, snapshot)
+                            ReportExportEngine.shareGeneratedFile(context, csvFile, "text/csv")
+                            Toast.makeText(context, "CSV generated: ${csvFile.name}", Toast.LENGTH_SHORT).show()
+                            showExportDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("export_csv_btn")
+                    ) {
+                        Icon(Icons.Default.TableChart, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Export RFC-4180 CSV Ledger")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val textSummary = ReportExportEngine.generateExecutiveSummaryText(snapshot)
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("LifeOS_Report", textSummary))
+                            Toast.makeText(context, "Executive report copied to clipboard!", Toast.LENGTH_SHORT).show()
+                            showExportDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("copy_report_summary_btn")
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Copy Text Executive Summary")
+                    }
+                }
             },
             confirmButton = {
-                Button(onClick = { showExportDialog = false }) {
-                    Text("Download Summary")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExportDialog = false }) {
-                    Text("Close")
-                }
+                TextButton(onClick = { showExportDialog = false }) { Text("Close") }
             }
         )
     }

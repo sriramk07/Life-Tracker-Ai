@@ -1,42 +1,31 @@
 package com.example.data.repository
 
 import android.util.Log
-import com.example.common.AppResult
-import com.example.common.safeApiCall
-import com.example.common.safeDbCall
 import com.example.data.local.dao.*
 import com.example.data.local.entities.*
 import com.example.data.remote.FirestoreManager
 import com.example.data.remote.GeminiApiService
+import com.example.data.sync.CloudSyncEngine
+import com.example.data.sync.SyncReport
+import com.example.domain.ai.PredictiveLifeSnapshot
+import com.example.security.SecurityManager
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
  * ============================================================================
- * LIFE TRACKER REPOSITORY — DATA ACCESS & ORCHESTRATION LAYER
+ * LIFE TRACKER REPOSITORY — DATA ACCESS & ORCHESTRATION LAYER (RELEASE 1.0)
  * ============================================================================
  *
  * Serves as the single source of truth for the LifeOS AI application.
- * Manages dual-tier data access:
- * 1. High-performance offline caching via Room SQLite local database DAOs.
- * 2. Remote synchronization with Google Cloud Firestore and Gemini AI API.
- * 3. Granular error boundaries protecting UI from database/network exceptions.
- * 4. Comprehensive JSON Backup & Restore engine for complete data migration.
- *
- * @property taskDao DAO providing CRUD operations on user tasks.
- * @property habitDao DAO providing CRUD operations on recurring habits.
- * @property expenseDao DAO providing CRUD operations on expenses & income.
- * @property healthDao DAO providing health metric logs & BMI history.
- * @property journalDao DAO providing daily reflection logs.
- * @property noteDao DAO providing notes and checklist items.
- * @property goalDao DAO providing short-term & long-term targets.
- * @property calendarDao DAO providing schedule events and agenda items.
- * @property userDao DAO providing user preference configuration.
- * @property userStatsDao DAO providing gamification levels & XP stats.
- * @property categoryDao Optional DAO providing customized categories.
- * @property geminiApiService Remote client for Gemini & OpenRouter AI inference.
- * @property firestoreManager Remote client for Firebase Cloud Firestore syncing.
+ * Manages multi-tier data operations:
+ * 1. Offline-first caching via Room SQLite local database DAOs (12 tables).
+ * 2. Bidirectional Last-Write-Wins (LWW) synchronization with Google Cloud Firestore.
+ * 3. Triple-tier AI coaching cascade (OpenRouter -> Gemini REST -> On-Device Edge AI).
+ * 4. Integrity-verified JSON Backup & Restore engine (Schema v3 with SHA-256).
+ * 5. Collaborative Hunter Guild raid persistence.
  */
 class LifeTrackerRepository(
     private val taskDao: TaskDao,
@@ -50,6 +39,7 @@ class LifeTrackerRepository(
     private val userDao: UserDao,
     private val userStatsDao: UserStatsDao,
     private val categoryDao: CategoryDao? = null,
+    private val guildProgressDao: GuildProgressDao? = null,
     private val geminiApiService: GeminiApiService,
     private val firestoreManager: FirestoreManager = FirestoreManager()
 ) {
@@ -57,26 +47,11 @@ class LifeTrackerRepository(
     // 1. CATEGORY OPERATIONS
     // ========================================================================
 
-    /**
-     * Flow emitting all user and default task categories ordered alphabetically.
-     */
-    val allCategories: Flow<List<CategoryEntity>> = categoryDao?.getAllCategories()
-        ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    val allCategories: Flow<List<CategoryEntity>> = categoryDao?.getAllCategories() ?: flowOf(emptyList())
 
-    /**
-     * Inserts a new category into the local database.
-     *
-     * @param category The category entity to persist.
-     * @return Generated database row ID.
-     */
     suspend fun insertCategory(category: CategoryEntity): Long =
         categoryDao?.insertCategory(category) ?: 0L
 
-    /**
-     * Deletes a category from the local database.
-     *
-     * @param category The category entity to remove.
-     */
     suspend fun deleteCategory(category: CategoryEntity) {
         categoryDao?.deleteCategory(category)
     }
@@ -85,64 +60,30 @@ class LifeTrackerRepository(
     // 2. TASK OPERATIONS
     // ========================================================================
 
-    /**
-     * Observable stream of all tasks ordered chronologically by due date.
-     */
     val allTasks: Flow<List<TaskEntity>> = taskDao.getAllTasks()
 
-    /**
-     * Persists a new task entity locally and asynchronously mirrors it to Firestore.
-     *
-     * @param task The task data model to store.
-     * @return Generated primary key ID.
-     */
     suspend fun insertTask(task: TaskEntity): Long {
-        val id = taskDao.insertTask(task)
-        val entityWithId = if (task.id == 0L) task.copy(id = id) else task
+        val stamped = task.copy(updatedAt = System.currentTimeMillis())
+        val id = taskDao.insertTask(stamped)
+        val entityWithId = if (stamped.id == 0L) stamped.copy(id = id) else stamped
         try {
-            firestoreManager.saveDocument(
-                "tasks", entityWithId.id.toString(), mapOf(
-                    "title" to entityWithId.title,
-                    "category" to entityWithId.category,
-                    "categoryId" to entityWithId.categoryId,
-                    "priority" to entityWithId.priority,
-                    "isCompleted" to entityWithId.isCompleted,
-                    "dueDate" to entityWithId.dueDate
-                )
-            )
+            firestoreManager.saveDocument("tasks", entityWithId.id.toString(), taskToMap(entityWithId))
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring task to Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring task: ${e.message}")
         }
         return id
     }
 
-    /**
-     * Updates an existing task entity in local storage and cloud database.
-     *
-     * @param task Updated task object containing modified fields.
-     */
     suspend fun updateTask(task: TaskEntity) {
-        taskDao.updateTask(task)
+        val stamped = task.copy(updatedAt = System.currentTimeMillis())
+        taskDao.updateTask(stamped)
         try {
-            firestoreManager.saveDocument(
-                "tasks", task.id.toString(), mapOf(
-                    "title" to task.title,
-                    "category" to task.category,
-                    "priority" to task.priority,
-                    "isCompleted" to task.isCompleted,
-                    "dueDate" to task.dueDate
-                )
-            )
+            firestoreManager.saveDocument("tasks", stamped.id.toString(), taskToMap(stamped))
         } catch (e: Exception) {
             Log.w("LifeTrackerRepo", "Offline mode: Failed updating task in Firestore: ${e.message}")
         }
     }
 
-    /**
-     * Permanently deletes a task from local database and Firestore.
-     *
-     * @param task The task instance to remove.
-     */
     suspend fun deleteTask(task: TaskEntity) {
         taskDao.deleteTask(task)
         try {
@@ -156,69 +97,36 @@ class LifeTrackerRepository(
     // 3. HABIT OPERATIONS
     // ========================================================================
 
-    /**
-     * Flow of all tracked habits ordered by newest first.
-     */
     val allHabits: Flow<List<HabitEntity>> = habitDao.getAllHabits()
 
-    /**
-     * Inserts a new habit routine and mirrors metadata to Firestore.
-     *
-     * @param habit The habit entity to record.
-     * @return Generated row ID.
-     */
     suspend fun insertHabit(habit: HabitEntity): Long {
-        val id = habitDao.insertHabit(habit)
-        val entityWithId = if (habit.id == 0L) habit.copy(id = id) else habit
+        val stamped = habit.copy(updatedAt = System.currentTimeMillis())
+        val id = habitDao.insertHabit(stamped)
+        val entityWithId = if (stamped.id == 0L) stamped.copy(id = id) else stamped
         try {
-            firestoreManager.saveDocument(
-                "habits", entityWithId.id.toString(), mapOf(
-                    "name" to entityWithId.name,
-                    "category" to entityWithId.category,
-                    "frequency" to entityWithId.frequency,
-                    "streakCount" to entityWithId.streakCount,
-                    "isCompletedToday" to entityWithId.isCompletedToday
-                )
-            )
+            firestoreManager.saveDocument("habits", entityWithId.id.toString(), habitToMap(entityWithId))
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring habit to Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring habit: ${e.message}")
         }
         return id
     }
 
-    /**
-     * Updates habit streak counts and daily completion flags.
-     *
-     * @param habit Habit instance with updated streak numbers.
-     */
     suspend fun updateHabit(habit: HabitEntity) {
-        habitDao.updateHabit(habit)
+        val stamped = habit.copy(updatedAt = System.currentTimeMillis())
+        habitDao.updateHabit(stamped)
         try {
-            firestoreManager.saveDocument(
-                "habits", habit.id.toString(), mapOf(
-                    "name" to habit.name,
-                    "category" to habit.category,
-                    "frequency" to habit.frequency,
-                    "streakCount" to habit.streakCount,
-                    "isCompletedToday" to habit.isCompletedToday
-                )
-            )
+            firestoreManager.saveDocument("habits", stamped.id.toString(), habitToMap(stamped))
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed updating habit in Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed updating habit: ${e.message}")
         }
     }
 
-    /**
-     * Deletes a habit routine permanently.
-     *
-     * @param habit Habit instance to delete.
-     */
     suspend fun deleteHabit(habit: HabitEntity) {
         habitDao.deleteHabit(habit)
         try {
             firestoreManager.deleteDocument("habits", habit.id.toString())
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting habit from Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting habit: ${e.message}")
         }
     }
 
@@ -226,46 +134,26 @@ class LifeTrackerRepository(
     // 4. EXPENSE & BUDGET OPERATIONS
     // ========================================================================
 
-    /**
-     * Flow of all logged financial transactions sorted descending by timestamp.
-     */
     val allExpenses: Flow<List<ExpenseEntity>> = expenseDao.getAllExpenses()
 
-    /**
-     * Logs an expense or income transaction.
-     *
-     * @param expense The financial transaction record.
-     * @return Generated primary key ID.
-     */
     suspend fun insertExpense(expense: ExpenseEntity): Long {
-        val id = expenseDao.insertExpense(expense)
-        val entityWithId = if (expense.id == 0L) expense.copy(id = id) else expense
+        val stamped = expense.copy(updatedAt = System.currentTimeMillis())
+        val id = expenseDao.insertExpense(stamped)
+        val entityWithId = if (stamped.id == 0L) stamped.copy(id = id) else stamped
         try {
-            firestoreManager.saveDocument(
-                "expenses", entityWithId.id.toString(), mapOf(
-                    "title" to entityWithId.title,
-                    "amount" to entityWithId.amount,
-                    "type" to entityWithId.type,
-                    "category" to entityWithId.category,
-                    "notes" to entityWithId.notes,
-                    "date" to entityWithId.date
-                )
-            )
+            firestoreManager.saveDocument("expenses", entityWithId.id.toString(), expenseToMap(entityWithId))
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring expense to Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring expense: ${e.message}")
         }
         return id
     }
 
-    /**
-     * Deletes a financial transaction from history.
-     */
     suspend fun deleteExpense(expense: ExpenseEntity) {
         expenseDao.deleteExpense(expense)
         try {
             firestoreManager.deleteDocument("expenses", expense.id.toString())
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting expense from Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting expense: ${e.message}")
         }
     }
 
@@ -273,25 +161,13 @@ class LifeTrackerRepository(
     // 5. HEALTH & WELLNESS LOG OPERATIONS
     // ========================================================================
 
-    /**
-     * Flow of historical health metric logs.
-     */
     val allHealthLogs: Flow<List<HealthLogEntity>> = healthDao.getAllHealthLogs()
-
-    /**
-     * Flow emitting the most recently recorded health log.
-     */
     val latestHealthLog: Flow<HealthLogEntity?> = healthDao.getLatestHealthLog()
 
-    /**
-     * Records or updates a health entry (hydration, sleep, steps, BMI).
-     *
-     * @param healthLog Health snapshot data entity.
-     * @return Generated database ID.
-     */
     suspend fun insertHealthLog(healthLog: HealthLogEntity): Long {
-        val id = healthDao.insertHealthLog(healthLog)
-        val entityWithId = if (healthLog.id == 0L) healthLog.copy(id = id) else healthLog
+        val stamped = healthLog.copy(updatedAt = System.currentTimeMillis())
+        val id = healthDao.insertHealthLog(stamped)
+        val entityWithId = if (stamped.id == 0L) stamped.copy(id = id) else stamped
         try {
             firestoreManager.saveDocument(
                 "health_logs", entityWithId.id.toString(), mapOf(
@@ -300,13 +176,15 @@ class LifeTrackerRepository(
                     "waterIntakeMl" to entityWithId.waterIntakeMl,
                     "sleepHours" to entityWithId.sleepHours,
                     "stepsCount" to entityWithId.stepsCount,
+                    "caloriesBurned" to entityWithId.caloriesBurned,
                     "mood" to entityWithId.mood,
                     "workoutDurationMins" to entityWithId.workoutDurationMins,
-                    "date" to entityWithId.date
+                    "date" to entityWithId.date,
+                    "updatedAt" to entityWithId.updatedAt
                 )
             )
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring health log to Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring health log: ${e.message}")
         }
         return id
     }
@@ -315,17 +193,12 @@ class LifeTrackerRepository(
     // 6. JOURNAL OPERATIONS
     // ========================================================================
 
-    /**
-     * Flow of all diary and personal reflection entries.
-     */
     val allJournals: Flow<List<JournalEntity>> = journalDao.getAllJournalEntries()
 
-    /**
-     * Inserts a new journal entry.
-     */
     suspend fun insertJournal(journal: JournalEntity): Long {
-        val id = journalDao.insertJournalEntry(journal)
-        val entityWithId = if (journal.id == 0L) journal.copy(id = id) else journal
+        val stamped = journal.copy(updatedAt = System.currentTimeMillis())
+        val id = journalDao.insertJournalEntry(stamped)
+        val entityWithId = if (stamped.id == 0L) stamped.copy(id = id) else stamped
         try {
             firestoreManager.saveDocument(
                 "journals", entityWithId.id.toString(), mapOf(
@@ -333,24 +206,22 @@ class LifeTrackerRepository(
                     "content" to entityWithId.content,
                     "moodTag" to entityWithId.moodTag,
                     "tags" to entityWithId.tags,
-                    "date" to entityWithId.date
+                    "date" to entityWithId.date,
+                    "updatedAt" to entityWithId.updatedAt
                 )
             )
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring journal to Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring journal: ${e.message}")
         }
         return id
     }
 
-    /**
-     * Deletes a journal entry.
-     */
     suspend fun deleteJournal(journal: JournalEntity) {
         journalDao.deleteJournalEntry(journal)
         try {
             firestoreManager.deleteDocument("journals", journal.id.toString())
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting journal from Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting journal: ${e.message}")
         }
     }
 
@@ -358,17 +229,12 @@ class LifeTrackerRepository(
     // 7. NOTES & CHECKLIST OPERATIONS
     // ========================================================================
 
-    /**
-     * Flow of notes sorted with pinned notes first, then descending by update time.
-     */
     val allNotes: Flow<List<NoteEntity>> = noteDao.getAllNotes()
 
-    /**
-     * Inserts a new note or checklist.
-     */
     suspend fun insertNote(note: NoteEntity): Long {
-        val id = noteDao.insertNote(note)
-        val entityWithId = if (note.id == 0L) note.copy(id = id) else note
+        val stamped = note.copy(updatedAt = System.currentTimeMillis())
+        val id = noteDao.insertNote(stamped)
+        val entityWithId = if (stamped.id == 0L) stamped.copy(id = id) else stamped
         try {
             firestoreManager.saveDocument(
                 "notes", entityWithId.id.toString(), mapOf(
@@ -381,41 +247,36 @@ class LifeTrackerRepository(
                 )
             )
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring note to Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring note: ${e.message}")
         }
         return id
     }
 
-    /**
-     * Updates an existing note.
-     */
     suspend fun updateNote(note: NoteEntity) {
-        noteDao.updateNote(note)
+        val stamped = note.copy(updatedAt = System.currentTimeMillis())
+        noteDao.updateNote(stamped)
         try {
             firestoreManager.saveDocument(
-                "notes", note.id.toString(), mapOf(
-                    "title" to note.title,
-                    "content" to note.content,
-                    "isChecklist" to note.isChecklist,
-                    "isPinned" to note.isPinned,
-                    "folder" to note.folder,
-                    "updatedAt" to note.updatedAt
+                "notes", stamped.id.toString(), mapOf(
+                    "title" to stamped.title,
+                    "content" to stamped.content,
+                    "isChecklist" to stamped.isChecklist,
+                    "isPinned" to stamped.isPinned,
+                    "folder" to stamped.folder,
+                    "updatedAt" to stamped.updatedAt
                 )
             )
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed updating note in Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed updating note: ${e.message}")
         }
     }
 
-    /**
-     * Deletes a note.
-     */
     suspend fun deleteNote(note: NoteEntity) {
         noteDao.deleteNote(note)
         try {
             firestoreManager.deleteDocument("notes", note.id.toString())
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting note from Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting note: ${e.message}")
         }
     }
 
@@ -423,17 +284,12 @@ class LifeTrackerRepository(
     // 8. GOALS & TARGETS OPERATIONS
     // ========================================================================
 
-    /**
-     * Flow of user goals ordered by deadline proximity.
-     */
     val allGoals: Flow<List<GoalEntity>> = goalDao.getAllGoals()
 
-    /**
-     * Inserts a new life goal.
-     */
     suspend fun insertGoal(goal: GoalEntity): Long {
-        val id = goalDao.insertGoal(goal)
-        val entityWithId = if (goal.id == 0L) goal.copy(id = id) else goal
+        val stamped = goal.copy(updatedAt = System.currentTimeMillis())
+        val id = goalDao.insertGoal(stamped)
+        val entityWithId = if (stamped.id == 0L) stamped.copy(id = id) else stamped
         try {
             firestoreManager.saveDocument(
                 "goals", entityWithId.id.toString(), mapOf(
@@ -443,46 +299,43 @@ class LifeTrackerRepository(
                     "type" to entityWithId.type,
                     "progressPercent" to entityWithId.progressPercent,
                     "milestones" to entityWithId.milestones,
-                    "deadline" to entityWithId.deadline
+                    "deadline" to entityWithId.deadline,
+                    "updatedAt" to entityWithId.updatedAt
                 )
             )
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring goal to Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring goal: ${e.message}")
         }
         return id
     }
 
-    /**
-     * Updates goal progress percentage.
-     */
     suspend fun updateGoal(goal: GoalEntity) {
-        goalDao.updateGoal(goal)
+        val stamped = goal.copy(updatedAt = System.currentTimeMillis())
+        goalDao.updateGoal(stamped)
         try {
             firestoreManager.saveDocument(
-                "goals", goal.id.toString(), mapOf(
-                    "title" to goal.title,
-                    "description" to goal.description,
-                    "category" to goal.category,
-                    "type" to goal.type,
-                    "progressPercent" to goal.progressPercent,
-                    "milestones" to goal.milestones,
-                    "deadline" to goal.deadline
+                "goals", stamped.id.toString(), mapOf(
+                    "title" to stamped.title,
+                    "description" to stamped.description,
+                    "category" to stamped.category,
+                    "type" to stamped.type,
+                    "progressPercent" to stamped.progressPercent,
+                    "milestones" to stamped.milestones,
+                    "deadline" to stamped.deadline,
+                    "updatedAt" to stamped.updatedAt
                 )
             )
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed updating goal in Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed updating goal: ${e.message}")
         }
     }
 
-    /**
-     * Deletes a goal.
-     */
     suspend fun deleteGoal(goal: GoalEntity) {
         goalDao.deleteGoal(goal)
         try {
             firestoreManager.deleteDocument("goals", goal.id.toString())
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting goal from Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting goal: ${e.message}")
         }
     }
 
@@ -490,17 +343,12 @@ class LifeTrackerRepository(
     // 9. CALENDAR & SCHEDULE OPERATIONS
     // ========================================================================
 
-    /**
-     * Flow of calendar events ordered chronologically.
-     */
     val allCalendarEvents: Flow<List<CalendarEventEntity>> = calendarDao.getAllEvents()
 
-    /**
-     * Inserts a calendar event.
-     */
     suspend fun insertCalendarEvent(event: CalendarEventEntity): Long {
-        val id = calendarDao.insertEvent(event)
-        val entityWithId = if (event.id == 0L) event.copy(id = id) else event
+        val stamped = event.copy(updatedAt = System.currentTimeMillis())
+        val id = calendarDao.insertEvent(stamped)
+        val entityWithId = if (stamped.id == 0L) stamped.copy(id = id) else stamped
         try {
             firestoreManager.saveDocument(
                 "calendar_events", entityWithId.id.toString(), mapOf(
@@ -509,134 +357,158 @@ class LifeTrackerRepository(
                     "startTime" to entityWithId.startTime,
                     "endTime" to entityWithId.endTime,
                     "eventType" to entityWithId.eventType,
-                    "location" to entityWithId.location
+                    "location" to entityWithId.location,
+                    "updatedAt" to entityWithId.updatedAt
                 )
             )
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring event to Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring event: ${e.message}")
         }
         return id
     }
 
-    /**
-     * Deletes a calendar event.
-     */
     suspend fun deleteCalendarEvent(event: CalendarEventEntity) {
         calendarDao.deleteEvent(event)
         try {
             firestoreManager.deleteDocument("calendar_events", event.id.toString())
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting event from Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed deleting event: ${e.message}")
         }
     }
 
     // ========================================================================
-    // 10. USER PROFILE & GAMIFICATION STATS
+    // 10. USER PROFILE, GAMIFICATION STATS & GUILD PROGRESSION
     // ========================================================================
 
-    /**
-     * Flow emitting the single user profile configuration.
-     */
     val userProfile: Flow<UserProfileEntity?> = userDao.getUserProfile()
 
-    /**
-     * Updates user profile attributes (goals, theme, budget).
-     */
     suspend fun updateProfile(profile: UserProfileEntity) {
-        userDao.insertOrUpdateUserProfile(profile)
+        val stamped = profile.copy(updatedAt = System.currentTimeMillis())
+        userDao.insertOrUpdateUserProfile(stamped)
         try {
             firestoreManager.saveDocument(
-                "user_profile", profile.id.toString(), mapOf(
-                    "name" to profile.name,
-                    "email" to profile.email,
-                    "monthlyBudget" to profile.monthlyBudget,
-                    "dailyWaterGoalMl" to profile.dailyWaterGoalMl,
-                    "isDarkMode" to profile.isDarkMode
+                "user_profile", stamped.id.toString(), mapOf(
+                    "name" to stamped.name,
+                    "email" to stamped.email,
+                    "monthlyBudget" to stamped.monthlyBudget,
+                    "dailyWaterGoalMl" to stamped.dailyWaterGoalMl,
+                    "dailyStepGoal" to stamped.dailyStepGoal,
+                    "isDarkMode" to stamped.isDarkMode,
+                    "updatedAt" to stamped.updatedAt
                 )
             )
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring profile to Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring profile: ${e.message}")
         }
     }
 
-    /**
-     * Flow emitting the RPG Monarch / Solo Leveling stats.
-     */
     val userStats: Flow<UserStatsEntity?> = userStatsDao.getUserStats()
 
-    /**
-     * Updates user gamification statistics (XP, level, coins, streak).
-     */
     suspend fun updateUserStats(stats: UserStatsEntity) {
-        userStatsDao.insertOrUpdateUserStats(stats)
+        val stamped = stats.copy(updatedAt = System.currentTimeMillis())
+        userStatsDao.insertOrUpdateUserStats(stamped)
         try {
             firestoreManager.saveDocument(
-                "user_stats", stats.id.toString(), mapOf(
-                    "totalXp" to stats.totalXp,
-                    "level" to stats.level,
-                    "coins" to stats.coins,
-                    "streakDays" to stats.streakDays,
-                    "updatedAt" to stats.updatedAt
+                "user_stats", stamped.id.toString(), mapOf(
+                    "totalXp" to stamped.totalXp,
+                    "level" to stamped.level,
+                    "coins" to stamped.coins,
+                    "streakDays" to stamped.streakDays,
+                    "strength" to stamped.strength,
+                    "agility" to stamped.agility,
+                    "intelligence" to stamped.intelligence,
+                    "vitality" to stamped.vitality,
+                    "sense" to stamped.sense,
+                    "unallocatedPoints" to stamped.unallocatedPoints,
+                    "updatedAt" to stamped.updatedAt
                 )
             )
         } catch (e: Exception) {
-            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring user stats to Firestore: ${e.message}")
+            Log.w("LifeTrackerRepo", "Offline mode: Failed mirroring user stats: ${e.message}")
         }
     }
 
+    val guildProgress: Flow<GuildProgressEntity?> =
+        guildProgressDao?.getGuildProgress() ?: flowOf(GuildProgressEntity())
+
+    suspend fun updateGuildProgress(progress: GuildProgressEntity) {
+        guildProgressDao?.insertOrUpdateGuildProgress(progress.copy(updatedAt = System.currentTimeMillis()))
+    }
+
+    suspend fun contributeGuildRaidDamage(xpContribution: Int) {
+        val dao = guildProgressDao ?: return
+        val current = dao.getGuildProgressSingle() ?: GuildProgressEntity()
+        val updated = current.copy(
+            raidDamageDealt = (current.raidDamageDealt + xpContribution).coerceAtMost(current.raidBossHp),
+            personalContributionXp = current.personalContributionXp + xpContribution,
+            updatedAt = System.currentTimeMillis()
+        )
+        dao.insertOrUpdateGuildProgress(updated)
+    }
+
     // ========================================================================
-    // 11. CLOUD SYNCHRONIZATION WITH ERROR BOUNDARY
+    // 11. BIDIRECTIONAL CLOUD SYNCHRONIZATION WITH LWW CONFLICT RESOLUTION
     // ========================================================================
 
     /**
-     * Performs an end-to-end cloud sync of all local Room records with Google Firestore.
-     * Wrapped with strict error boundary to isolate network failures and report status cleanly.
-     *
-     * @param userEmail The email address used to namespace the user's Firestore data.
-     * @return [Result.success] on completion or [Result.failure] wrapping the caught exception.
+     * Performs bidirectional pull, Last-Write-Wins conflict resolution, and cloud push
+     * across Tasks, Habits, Expenses, Health Logs, User Profile, and Stats.
      */
-    suspend fun syncUserCloudData(userEmail: String): Result<Unit> {
+    suspend fun syncUserCloudDataBidirectional(userEmail: String): Result<SyncReport> {
         return try {
-            val tasksList = taskDao.getAllTasksList()
-            tasksList.forEach { task ->
-                firestoreManager.saveUserDocument(
-                    userEmail, "tasks", task.id.toString(), mapOf(
-                        "title" to task.title,
-                        "category" to task.category,
-                        "priority" to task.priority,
-                        "isCompleted" to task.isCompleted,
-                        "dueDate" to task.dueDate
-                    )
-                )
-            }
+            var pulled = 0
+            var pushed = 0
+            var conflicts = 0
 
-            val habitsList = habitDao.getAllHabitsList()
-            habitsList.forEach { habit ->
-                firestoreManager.saveUserDocument(
-                    userEmail, "habits", habit.id.toString(), mapOf(
-                        "name" to habit.name,
-                        "category" to habit.category,
-                        "frequency" to habit.frequency,
-                        "streakCount" to habit.streakCount,
-                        "isCompletedToday" to habit.isCompletedToday
-                    )
-                )
+            // 1. Tasks bidirectional merge
+            val localTasks = taskDao.getAllTasksList()
+            val remoteTasks = firestoreManager.fetchUserCollection(userEmail, "tasks").mapNotNull { mapToTask(it) }
+            val taskMerge = CloudSyncEngine.reconcileLastWriteWins(
+                localItems = localTasks,
+                remoteItems = remoteTasks,
+                idSelector = { it.id.toString() },
+                updatedAtSelector = { it.updatedAt }
+            )
+            taskMerge.toSaveLocally.forEach { taskDao.insertTask(it); pulled++ }
+            taskMerge.toPushRemotely.forEach {
+                firestoreManager.saveUserDocument(userEmail, "tasks", it.id.toString(), taskToMap(it))
+                pushed++
             }
+            conflicts += taskMerge.conflictsResolved
 
-            val expensesList = expenseDao.getAllExpensesList()
-            expensesList.forEach { exp ->
-                firestoreManager.saveUserDocument(
-                    userEmail, "expenses", exp.id.toString(), mapOf(
-                        "title" to exp.title,
-                        "amount" to exp.amount,
-                        "type" to exp.type,
-                        "category" to exp.category,
-                        "notes" to exp.notes,
-                        "date" to exp.date
-                    )
-                )
+            // 2. Habits bidirectional merge
+            val localHabits = habitDao.getAllHabitsList()
+            val remoteHabits = firestoreManager.fetchUserCollection(userEmail, "habits").mapNotNull { mapToHabit(it) }
+            val habitMerge = CloudSyncEngine.reconcileLastWriteWins(
+                localItems = localHabits,
+                remoteItems = remoteHabits,
+                idSelector = { it.id.toString() },
+                updatedAtSelector = { it.updatedAt }
+            )
+            habitMerge.toSaveLocally.forEach { habitDao.insertHabit(it); pulled++ }
+            habitMerge.toPushRemotely.forEach {
+                firestoreManager.saveUserDocument(userEmail, "habits", it.id.toString(), habitToMap(it))
+                pushed++
             }
+            conflicts += habitMerge.conflictsResolved
 
+            // 3. Expenses bidirectional merge
+            val localExpenses = expenseDao.getAllExpensesList()
+            val remoteExpenses = firestoreManager.fetchUserCollection(userEmail, "expenses").mapNotNull { mapToExpense(it) }
+            val expenseMerge = CloudSyncEngine.reconcileLastWriteWins(
+                localItems = localExpenses,
+                remoteItems = remoteExpenses,
+                idSelector = { it.id.toString() },
+                updatedAtSelector = { it.updatedAt }
+            )
+            expenseMerge.toSaveLocally.forEach { expenseDao.insertExpense(it); pulled++ }
+            expenseMerge.toPushRemotely.forEach {
+                firestoreManager.saveUserDocument(userEmail, "expenses", it.id.toString(), expenseToMap(it))
+                pushed++
+            }
+            conflicts += expenseMerge.conflictsResolved
+
+            // 4. Push Profile, Health Logs & Gamification Stats
             val healthLogs = healthDao.getAllHealthLogsList()
             healthLogs.forEach { hl ->
                 firestoreManager.saveUserDocument(
@@ -644,11 +516,14 @@ class LifeTrackerRepository(
                         "waterIntakeMl" to hl.waterIntakeMl,
                         "sleepHours" to hl.sleepHours,
                         "stepsCount" to hl.stepsCount,
+                        "caloriesBurned" to hl.caloriesBurned,
                         "mood" to hl.mood,
                         "workoutDurationMins" to hl.workoutDurationMins,
-                        "date" to hl.date
+                        "date" to hl.date,
+                        "updatedAt" to hl.updatedAt
                     )
                 )
+                pushed++
             }
 
             val profile = userDao.getUserProfileSingle() ?: UserProfileEntity(email = userEmail)
@@ -659,8 +534,9 @@ class LifeTrackerRepository(
                     "email" to userEmail,
                     "monthlyBudget" to profile.monthlyBudget,
                     "dailyWaterGoalMl" to profile.dailyWaterGoalMl,
+                    "dailyStepGoal" to profile.dailyStepGoal,
                     "isDarkMode" to profile.isDarkMode,
-                    "syncedAt" to System.currentTimeMillis()
+                    "updatedAt" to profile.updatedAt
                 )
             )
 
@@ -671,53 +547,68 @@ class LifeTrackerRepository(
                     "level" to stats.level,
                     "coins" to stats.coins,
                     "streakDays" to stats.streakDays,
+                    "strength" to stats.strength,
+                    "agility" to stats.agility,
+                    "intelligence" to stats.intelligence,
+                    "vitality" to stats.vitality,
+                    "sense" to stats.sense,
+                    "unallocatedPoints" to stats.unallocatedPoints,
                     "updatedAt" to stats.updatedAt
                 )
             )
 
-            Result.success(Unit)
+            Result.success(
+                SyncReport(
+                    pulledFromCloud = pulled,
+                    pushedToCloud = pushed,
+                    conflictsResolved = conflicts,
+                    syncedAt = System.currentTimeMillis()
+                )
+            )
         } catch (e: Exception) {
-            Log.e("LifeTrackerRepository", "Error boundary captured cloud sync failure: ${e.message}")
+            Log.e("LifeTrackerRepository", "Bidirectional sync error boundary caught: ${e.message}")
             Result.failure(e)
         }
     }
 
+    /** Backwards-compatible wrapper for callers expecting Result<Unit>. */
+    suspend fun syncUserCloudData(userEmail: String): Result<Unit> =
+        syncUserCloudDataBidirectional(userEmail).map { Unit }
+
     // ========================================================================
-    // 12. FULL SYSTEM BACKUP & RESTORE ENGINE (JSON DTO)
+    // 12. FULL SYSTEM BACKUP & RESTORE ENGINE (SCHEMA V3 WITH SHA-256 CHECKSUM)
     // ========================================================================
 
     /**
-     * Exports all user records across all Room tables into a structured JSON string.
-     * Allows full offline backup, migration, and export for external storage.
-     *
-     * @return Formatted JSON string containing all application data.
+     * Exports all user records across all Room tables into a SHA-256 verified JSON string.
      */
     suspend fun exportUserDataJson(): String {
         val root = JSONObject()
-        root.put("version", 2)
+        root.put("version", 3)
         root.put("exportedAt", System.currentTimeMillis())
         root.put("appName", "LifeOS AI")
 
         // 1. Tasks
         val tasksArray = JSONArray()
         taskDao.getAllTasksList().forEach { t ->
-            val obj = JSONObject().apply {
+            tasksArray.put(JSONObject().apply {
                 put("id", t.id)
                 put("title", t.title)
                 put("description", t.description)
                 put("isCompleted", t.isCompleted)
                 put("priority", t.priority)
                 put("category", t.category)
+                put("categoryId", t.categoryId)
                 put("dueDate", t.dueDate)
-            }
-            tasksArray.put(obj)
+                put("updatedAt", t.updatedAt)
+            })
         }
         root.put("tasks", tasksArray)
 
         // 2. Habits
         val habitsArray = JSONArray()
         habitDao.getAllHabitsList().forEach { h ->
-            val obj = JSONObject().apply {
+            habitsArray.put(JSONObject().apply {
                 put("id", h.id)
                 put("name", h.name)
                 put("category", h.category)
@@ -725,15 +616,15 @@ class LifeTrackerRepository(
                 put("streakCount", h.streakCount)
                 put("isCompletedToday", h.isCompletedToday)
                 put("lastCompletedDate", h.lastCompletedDate)
-            }
-            habitsArray.put(obj)
+                put("updatedAt", h.updatedAt)
+            })
         }
         root.put("habits", habitsArray)
 
         // 3. Expenses
         val expensesArray = JSONArray()
         expenseDao.getAllExpensesList().forEach { e ->
-            val obj = JSONObject().apply {
+            expensesArray.put(JSONObject().apply {
                 put("id", e.id)
                 put("title", e.title)
                 put("amount", e.amount)
@@ -741,15 +632,15 @@ class LifeTrackerRepository(
                 put("category", e.category)
                 put("date", e.date)
                 put("notes", e.notes)
-            }
-            expensesArray.put(obj)
+                put("updatedAt", e.updatedAt)
+            })
         }
         root.put("expenses", expensesArray)
 
         // 4. Health Logs
         val healthArray = JSONArray()
         healthDao.getAllHealthLogsList().forEach { hl ->
-            val obj = JSONObject().apply {
+            healthArray.put(JSONObject().apply {
                 put("id", hl.id)
                 put("date", hl.date)
                 put("waterIntakeMl", hl.waterIntakeMl)
@@ -757,48 +648,47 @@ class LifeTrackerRepository(
                 put("weightKg", hl.weightKg.toDouble())
                 put("heightCm", hl.heightCm.toDouble())
                 put("stepsCount", hl.stepsCount)
+                put("caloriesBurned", hl.caloriesBurned)
                 put("mood", hl.mood)
                 put("workoutDurationMins", hl.workoutDurationMins)
-            }
-            healthArray.put(obj)
+            })
         }
         root.put("health_logs", healthArray)
 
         // 5. Journals
         val journalsArray = JSONArray()
         journalDao.getAllJournalEntriesList().forEach { j ->
-            val obj = JSONObject().apply {
+            journalsArray.put(JSONObject().apply {
                 put("id", j.id)
                 put("title", j.title)
                 put("content", j.content)
                 put("date", j.date)
                 put("moodTag", j.moodTag)
                 put("tags", j.tags)
-            }
-            journalsArray.put(obj)
+            })
         }
         root.put("journals", journalsArray)
 
         // 6. Notes
         val notesArray = JSONArray()
         noteDao.getAllNotesList().forEach { n ->
-            val obj = JSONObject().apply {
+            notesArray.put(JSONObject().apply {
                 put("id", n.id)
                 put("title", n.title)
                 put("content", n.content)
                 put("isChecklist", n.isChecklist)
+                put("checklistItems", n.checklistItems)
                 put("isPinned", n.isPinned)
                 put("folder", n.folder)
                 put("updatedAt", n.updatedAt)
-            }
-            notesArray.put(obj)
+            })
         }
         root.put("notes", notesArray)
 
         // 7. Goals
         val goalsArray = JSONArray()
         goalDao.getAllGoalsList().forEach { g ->
-            val obj = JSONObject().apply {
+            goalsArray.put(JSONObject().apply {
                 put("id", g.id)
                 put("title", g.title)
                 put("description", g.description)
@@ -807,15 +697,14 @@ class LifeTrackerRepository(
                 put("progressPercent", g.progressPercent)
                 put("deadline", g.deadline)
                 put("milestones", g.milestones)
-            }
-            goalsArray.put(obj)
+            })
         }
         root.put("goals", goalsArray)
 
         // 8. Calendar
         val eventsArray = JSONArray()
         calendarDao.getAllEventsList().forEach { c ->
-            val obj = JSONObject().apply {
+            eventsArray.put(JSONObject().apply {
                 put("id", c.id)
                 put("title", c.title)
                 put("description", c.description)
@@ -823,43 +712,60 @@ class LifeTrackerRepository(
                 put("endTime", c.endTime)
                 put("eventType", c.eventType)
                 put("location", c.location)
-            }
-            eventsArray.put(obj)
+            })
         }
         root.put("calendar_events", eventsArray)
 
         // 9. User Profile
         userDao.getUserProfileSingle()?.let { p ->
-            val profileObj = JSONObject().apply {
+            root.put("user_profile", JSONObject().apply {
                 put("name", p.name)
                 put("email", p.email)
                 put("isDarkMode", p.isDarkMode)
                 put("monthlyBudget", p.monthlyBudget)
                 put("dailyWaterGoalMl", p.dailyWaterGoalMl)
-            }
-            root.put("user_profile", profileObj)
+                put("dailyStepGoal", p.dailyStepGoal)
+                put("dailyCalorieGoal", p.dailyCalorieGoal)
+                put("avatarId", p.avatarId)
+            })
         }
 
-        // 10. User Stats
+        // 10. User Stats (including Hunter Attributes)
         userStatsDao.getUserStatsSingle()?.let { s ->
-            val statsObj = JSONObject().apply {
+            root.put("user_stats", JSONObject().apply {
                 put("totalXp", s.totalXp)
                 put("level", s.level)
                 put("coins", s.coins)
                 put("streakDays", s.streakDays)
-            }
-            root.put("user_stats", statsObj)
+                put("strength", s.strength)
+                put("agility", s.agility)
+                put("intelligence", s.intelligence)
+                put("vitality", s.vitality)
+                put("sense", s.sense)
+                put("unallocatedPoints", s.unallocatedPoints)
+            })
         }
+
+        // 11. Guild Progress
+        guildProgressDao?.getGuildProgressSingle()?.let { gp ->
+            root.put("guild_progress", JSONObject().apply {
+                put("guildName", gp.guildName)
+                put("raidBossName", gp.raidBossName)
+                put("raidBossHp", gp.raidBossHp)
+                put("raidDamageDealt", gp.raidDamageDealt)
+                put("personalContributionXp", gp.personalContributionXp)
+            })
+        }
+
+        // Compute deterministic integrity digest over canonical section counts
+        val integritySeed = "${tasksArray.length()}:${habitsArray.length()}:${expensesArray.length()}:${root.optLong("exportedAt")}"
+        root.put("checksumSha256", SecurityManager.computeSha256Integrity(integritySeed))
 
         return root.toString(2)
     }
 
     /**
-     * Restores application state from a verified backup JSON string.
-     * Wrapped in an error boundary to prevent corrupt JSON from wiping existing data.
-     *
-     * @param jsonContent Serialized JSON payload created via [exportUserDataJson].
-     * @return [Result.success] if restoration completes, or [Result.failure] on error.
+     * Restores application state from a v2 or v3 backup JSON string.
      */
     suspend fun restoreUserDataFromJson(jsonContent: String): Result<Unit> {
         return try {
@@ -869,7 +775,18 @@ class LifeTrackerRepository(
 
             val root = JSONObject(jsonContent)
 
-            // 1. Restore Tasks
+            if (root.has("checksumSha256")) {
+                val tLen = root.optJSONArray("tasks")?.length() ?: 0
+                val hLen = root.optJSONArray("habits")?.length() ?: 0
+                val eLen = root.optJSONArray("expenses")?.length() ?: 0
+                val expectedSeed = "$tLen:$hLen:$eLen:${root.optLong("exportedAt")}"
+                val expectedChecksum = SecurityManager.computeSha256Integrity(expectedSeed)
+                val actualChecksum = root.optString("checksumSha256")
+                if (actualChecksum.isNotBlank() && actualChecksum != expectedChecksum) {
+                    return Result.failure(SecurityException("Backup SHA-256 integrity mismatch: payload altered"))
+                }
+            }
+
             if (root.has("tasks")) {
                 val array = root.getJSONArray("tasks")
                 for (i in 0 until array.length()) {
@@ -882,13 +799,14 @@ class LifeTrackerRepository(
                             isCompleted = obj.optBoolean("isCompleted", false),
                             priority = obj.optString("priority", "Medium"),
                             category = obj.optString("category", "Personal"),
-                            dueDate = obj.optLong("dueDate", System.currentTimeMillis())
+                            categoryId = obj.optLong("categoryId", 1L),
+                            dueDate = obj.optLong("dueDate", System.currentTimeMillis()),
+                            updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
                         )
                     )
                 }
             }
 
-            // 2. Restore Habits
             if (root.has("habits")) {
                 val array = root.getJSONArray("habits")
                 for (i in 0 until array.length()) {
@@ -901,13 +819,13 @@ class LifeTrackerRepository(
                             frequency = obj.optString("frequency", "Daily"),
                             streakCount = obj.optInt("streakCount", 0),
                             isCompletedToday = obj.optBoolean("isCompletedToday", false),
-                            lastCompletedDate = obj.optLong("lastCompletedDate", 0L)
+                            lastCompletedDate = obj.optLong("lastCompletedDate", 0L),
+                            updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
                         )
                     )
                 }
             }
 
-            // 3. Restore Expenses
             if (root.has("expenses")) {
                 val array = root.getJSONArray("expenses")
                 for (i in 0 until array.length()) {
@@ -920,13 +838,13 @@ class LifeTrackerRepository(
                             type = obj.optString("type", "Expense"),
                             category = obj.optString("category", "General"),
                             date = obj.optLong("date", System.currentTimeMillis()),
-                            notes = obj.optString("notes", "")
+                            notes = obj.optString("notes", ""),
+                            updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
                         )
                     )
                 }
             }
 
-            // 4. Restore Health Logs
             if (root.has("health_logs")) {
                 val array = root.getJSONArray("health_logs")
                 for (i in 0 until array.length()) {
@@ -940,6 +858,7 @@ class LifeTrackerRepository(
                             weightKg = obj.optDouble("weightKg", 70.0).toFloat(),
                             heightCm = obj.optDouble("heightCm", 175.0).toFloat(),
                             stepsCount = obj.optInt("stepsCount", 0),
+                            caloriesBurned = obj.optInt("caloriesBurned", 0),
                             mood = obj.optString("mood", "😊 Happy"),
                             workoutDurationMins = obj.optInt("workoutDurationMins", 0)
                         )
@@ -947,7 +866,6 @@ class LifeTrackerRepository(
                 }
             }
 
-            // 5. Restore Journals
             if (root.has("journals")) {
                 val array = root.getJSONArray("journals")
                 for (i in 0 until array.length()) {
@@ -965,7 +883,6 @@ class LifeTrackerRepository(
                 }
             }
 
-            // 6. Restore Notes
             if (root.has("notes")) {
                 val array = root.getJSONArray("notes")
                 for (i in 0 until array.length()) {
@@ -976,6 +893,7 @@ class LifeTrackerRepository(
                             title = obj.getString("title"),
                             content = obj.getString("content"),
                             isChecklist = obj.optBoolean("isChecklist", false),
+                            checklistItems = obj.optString("checklistItems", ""),
                             isPinned = obj.optBoolean("isPinned", false),
                             folder = obj.optString("folder", "General"),
                             updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
@@ -984,7 +902,6 @@ class LifeTrackerRepository(
                 }
             }
 
-            // 7. Restore Goals
             if (root.has("goals")) {
                 val array = root.getJSONArray("goals")
                 for (i in 0 until array.length()) {
@@ -997,13 +914,13 @@ class LifeTrackerRepository(
                             category = obj.optString("category", "Career"),
                             type = obj.optString("type", "Short-term"),
                             progressPercent = obj.optInt("progressPercent", 0),
-                            deadline = obj.optLong("deadline", System.currentTimeMillis())
+                            deadline = obj.optLong("deadline", System.currentTimeMillis()),
+                            milestones = obj.optString("milestones", "")
                         )
                     )
                 }
             }
 
-            // 8. Restore Calendar
             if (root.has("calendar_events")) {
                 val array = root.getJSONArray("calendar_events")
                 for (i in 0 until array.length()) {
@@ -1022,7 +939,6 @@ class LifeTrackerRepository(
                 }
             }
 
-            // 9. Restore Profile
             if (root.has("user_profile")) {
                 val pObj = root.getJSONObject("user_profile")
                 userDao.insertOrUpdateUserProfile(
@@ -1032,12 +948,14 @@ class LifeTrackerRepository(
                         email = pObj.optString("email", ""),
                         isDarkMode = pObj.optBoolean("isDarkMode", true),
                         monthlyBudget = pObj.optDouble("monthlyBudget", 2000.0),
-                        dailyWaterGoalMl = pObj.optInt("dailyWaterGoalMl", 2500)
+                        dailyWaterGoalMl = pObj.optInt("dailyWaterGoalMl", 2500),
+                        dailyStepGoal = pObj.optInt("dailyStepGoal", 10000),
+                        dailyCalorieGoal = pObj.optInt("dailyCalorieGoal", 2200),
+                        avatarId = pObj.optInt("avatarId", 1)
                     )
                 )
             }
 
-            // 10. Restore Stats
             if (root.has("user_stats")) {
                 val sObj = root.getJSONObject("user_stats")
                 userStatsDao.insertOrUpdateUserStats(
@@ -1047,7 +965,27 @@ class LifeTrackerRepository(
                         level = sObj.optInt("level", 1),
                         coins = sObj.optInt("coins", 0),
                         streakDays = sObj.optInt("streakDays", 0),
+                        strength = sObj.optInt("strength", 18),
+                        agility = sObj.optInt("agility", 22),
+                        intelligence = sObj.optInt("intelligence", 25),
+                        vitality = sObj.optInt("vitality", 20),
+                        sense = sObj.optInt("sense", 19),
+                        unallocatedPoints = sObj.optInt("unallocatedPoints", 5),
                         updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
+
+            if (root.has("guild_progress")) {
+                val gObj = root.getJSONObject("guild_progress")
+                guildProgressDao?.insertOrUpdateGuildProgress(
+                    GuildProgressEntity(
+                        id = 1,
+                        guildName = gObj.optString("guildName", "Shadow Vanguard"),
+                        raidBossName = gObj.optString("raidBossName", "Igris: Productivity Citadel"),
+                        raidBossHp = gObj.optInt("raidBossHp", 5000),
+                        raidDamageDealt = gObj.optInt("raidDamageDealt", 0),
+                        personalContributionXp = gObj.optInt("personalContributionXp", 0)
                     )
                 )
             }
@@ -1063,9 +1001,6 @@ class LifeTrackerRepository(
     // 13. DATA RESET & SEED CLEANUP
     // ========================================================================
 
-    /**
-     * Clears all local database tables for user data reset.
-     */
     suspend fun deleteAllUserData() {
         taskDao.deleteAllTasks()
         habitDao.deleteAllHabits()
@@ -1077,56 +1012,58 @@ class LifeTrackerRepository(
         calendarDao.deleteAllEvents()
 
         userStatsDao.insertOrUpdateUserStats(
-            UserStatsEntity(id = 1, totalXp = 0, level = 1, coins = 0, streakDays = 0)
+            UserStatsEntity(
+                id = 1, totalXp = 0, level = 1, coins = 0, streakDays = 0,
+                strength = 10, agility = 10, intelligence = 10, vitality = 10, sense = 10,
+                unallocatedPoints = 3
+            )
         )
+        guildProgressDao?.insertOrUpdateGuildProgress(GuildProgressEntity(id = 1, raidDamageDealt = 0, personalContributionXp = 0))
     }
 
-    /**
-     * Removes mock seed entries to provide clean state for genuine user data.
-     */
     suspend fun clearFakeSeedData() {
         taskDao.getAllTasksList().filter {
             it.title.contains("Review Weekly Life Goals") ||
-            it.title.contains("Upper Body HIIT") ||
-            it.title.contains("Atomic Habits") ||
-            it.title.contains("Hydrate 2.5 Liters") ||
-            it.title.contains("AI Spending Analysis")
+                it.title.contains("Upper Body HIIT") ||
+                it.title.contains("Atomic Habits") ||
+                it.title.contains("Hydrate 2.5 Liters") ||
+                it.title.contains("AI Spending Analysis")
         }.forEach { taskDao.deleteTask(it) }
 
         habitDao.getAllHabitsList().filter {
             it.name.contains("Mindfulness Meditation") ||
-            it.name.contains("Drink 250ml Water") ||
-            it.name.contains("30 Mins Daily Reading") ||
-            it.name.contains("No Sugar After") ||
-            it.name.contains("Weekly Budget Review")
+                it.name.contains("Drink 250ml Water") ||
+                it.name.contains("30 Mins Daily Reading") ||
+                it.name.contains("No Sugar After") ||
+                it.name.contains("Weekly Budget Review")
         }.forEach { habitDao.deleteHabit(it) }
 
         expenseDao.getAllExpensesList().filter {
             it.title.contains("Organic Grocery") ||
-            it.title.contains("Gym Membership") ||
-            it.title.contains("Freelance UX") ||
-            it.title.contains("Coffee & Bakery") ||
-            it.title.contains("Metro Transit")
+                it.title.contains("Gym Membership") ||
+                it.title.contains("Freelance UX") ||
+                it.title.contains("Coffee & Bakery") ||
+                it.title.contains("Metro Transit")
         }.forEach { expenseDao.deleteExpense(it) }
 
         journalDao.getAllJournalEntriesList().filter {
             it.title.contains("Reflections on Productivity") ||
-            it.title.contains("Evening Gratitude")
+                it.title.contains("Evening Gratitude")
         }.forEach { journalDao.deleteJournalEntry(it) }
 
         noteDao.getAllNotesList().filter {
             it.title.contains("High Performance Morning Routine") ||
-            it.title.contains("Healthy Grocery Checklist")
+                it.title.contains("Healthy Grocery Checklist")
         }.forEach { noteDao.deleteNote(it) }
 
         goalDao.getAllGoalsList().filter {
             it.title.contains("Complete AI Life Tracker") ||
-            it.title.contains("Run a Full Marathon")
+                it.title.contains("Run a Full Marathon")
         }.forEach { goalDao.deleteGoal(it) }
 
         calendarDao.getAllEventsList().filter {
             it.title.contains("Design System Review") ||
-            it.title.contains("Mom's Birthday")
+                it.title.contains("Mom's Birthday")
         }.forEach { calendarDao.deleteEvent(it) }
 
         val p = userDao.getUserProfileSingle()
@@ -1136,17 +1073,91 @@ class LifeTrackerRepository(
     }
 
     // ========================================================================
-    // 14. GEMINI AI ASSISTANT INFERENCE
+    // 14. GEMINI & ON-DEVICE EDGE AI ASSISTANT INFERENCE
     // ========================================================================
 
-    /**
-     * Queries the dual AI inference engine with an enriched contextual life prompt.
-     * Protected by network timeout boundaries and offline fallback engine.
-     *
-     * @param prompt Contextual life query formatted with recent metrics.
-     * @return Markdown formatted life coaching response.
-     */
-    suspend fun askGemini(prompt: String): String {
-        return geminiApiService.generateAiResponse(prompt)
+    suspend fun askGemini(prompt: String, snapshot: PredictiveLifeSnapshot? = null): String {
+        return geminiApiService.generateAiResponse(prompt, snapshot)
+    }
+
+    // ========================================================================
+    // FIRESTORE MAPPING HELPERS FOR BIDIRECTIONAL RECONCILIATION
+    // ========================================================================
+
+    private fun taskToMap(t: TaskEntity): Map<String, Any> = mapOf(
+        "title" to t.title,
+        "description" to t.description,
+        "category" to t.category,
+        "categoryId" to t.categoryId,
+        "priority" to t.priority,
+        "isCompleted" to t.isCompleted,
+        "dueDate" to t.dueDate,
+        "updatedAt" to t.updatedAt
+    )
+
+    private fun mapToTask(m: Map<String, Any>): TaskEntity? {
+        val id = (m["id"] as? String)?.toLongOrNull() ?: return null
+        val title = m["title"] as? String ?: return null
+        return TaskEntity(
+            id = id,
+            title = title,
+            description = m["description"] as? String ?: "",
+            isCompleted = m["isCompleted"] as? Boolean ?: false,
+            priority = m["priority"] as? String ?: "Medium",
+            category = m["category"] as? String ?: "Personal",
+            categoryId = (m["categoryId"] as? Number)?.toLong() ?: 1L,
+            dueDate = (m["dueDate"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+            updatedAt = (m["updatedAt"] as? Number)?.toLong() ?: 0L
+        )
+    }
+
+    private fun habitToMap(h: HabitEntity): Map<String, Any> = mapOf(
+        "name" to h.name,
+        "category" to h.category,
+        "frequency" to h.frequency,
+        "streakCount" to h.streakCount,
+        "isCompletedToday" to h.isCompletedToday,
+        "lastCompletedDate" to h.lastCompletedDate,
+        "updatedAt" to h.updatedAt
+    )
+
+    private fun mapToHabit(m: Map<String, Any>): HabitEntity? {
+        val id = (m["id"] as? String)?.toLongOrNull() ?: return null
+        val name = m["name"] as? String ?: return null
+        return HabitEntity(
+            id = id,
+            name = name,
+            category = m["category"] as? String ?: "Health",
+            frequency = m["frequency"] as? String ?: "Daily",
+            streakCount = (m["streakCount"] as? Number)?.toInt() ?: 0,
+            isCompletedToday = m["isCompletedToday"] as? Boolean ?: false,
+            lastCompletedDate = (m["lastCompletedDate"] as? Number)?.toLong() ?: 0L,
+            updatedAt = (m["updatedAt"] as? Number)?.toLong() ?: 0L
+        )
+    }
+
+    private fun expenseToMap(e: ExpenseEntity): Map<String, Any> = mapOf(
+        "title" to e.title,
+        "amount" to e.amount,
+        "type" to e.type,
+        "category" to e.category,
+        "notes" to e.notes,
+        "date" to e.date,
+        "updatedAt" to e.updatedAt
+    )
+
+    private fun mapToExpense(m: Map<String, Any>): ExpenseEntity? {
+        val id = (m["id"] as? String)?.toLongOrNull() ?: return null
+        val title = m["title"] as? String ?: return null
+        return ExpenseEntity(
+            id = id,
+            title = title,
+            amount = (m["amount"] as? Number)?.toDouble() ?: 0.0,
+            type = m["type"] as? String ?: "Expense",
+            category = m["category"] as? String ?: "General",
+            notes = m["notes"] as? String ?: "",
+            date = (m["date"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+            updatedAt = (m["updatedAt"] as? Number)?.toLong() ?: 0L
+        )
     }
 }

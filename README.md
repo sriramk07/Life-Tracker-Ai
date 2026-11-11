@@ -1,83 +1,85 @@
 # 🌟 LifeOS AI — Intelligent Life Management & Gamification Engine
 
-> **Project Repository:** [Life-Tracker-Ai](https://github.com/thiraviyarajr2007-dotcom/Life-Tracker-Ai)  
-> **Milestone Status:** **75% Project Completion (Review 2 Submission Report)**  
-> **Previous Review:** Review 1 (35% Project Completion — Foundational Wireframes & Basic Skeletons)  
-> **Tech Stack:** Kotlin, Android Jetpack Compose, Room SQLite, Firebase (Auth & Cloud Firestore), OpenRouter / Google Gemini 2.5 Flash, Coroutines, Flow.
+> **Project Repository:** [sriramk07/Life-Tracker-Ai](https://github.com/sriramk07/Life-Tracker-Ai) *(forked from [thiraviyarajr2007-dotcom/Life-Tracker-Ai](https://github.com/thiraviyarajr2007-dotcom/Life-Tracker-Ai))*  
+> **Milestone Status:** **100% Project Completion (Final Review — Release 1.0 / App v2.0.0)**  
+> **Progression History:** Review 1 (35%) ➔ Review 2 (75%) ➔ **Final Release (100% Complete)**  
+> **Tech Stack:** Kotlin, Android Jetpack Compose, Room SQLite (Schema v4 + Non-Destructive Migrations), Firebase Auth & Cloud Firestore (Bidirectional LWW Sync), OpenRouter / Gemini 2.5 Flash + On-Device Edge AI Engine, Android KeyStore AES-256-GCM & BiometricPrompt, PdfDocument, Hardware Step Sensor, GitHub Actions CI/CD, and Interactive Web Companion.
 
 ---
 
-## 📌 Executive Summary & Milestone Progress
+## 📌 Executive Summary & Milestone Completion Matrix
 
-LifeOS AI is an all-in-one personal life management operating system that integrates task management, habit tracking, financial budgeting, health & wellness tracking, daily journaling, interactive note taking, goal roadmapping, and scheduled calendar planning. It transforms daily habit building and productivity into an engaging experience inspired by the **Solo Leveling / Monarch System**, featuring dynamic XP progression, Hunter Ranks, attribute point allocation (STR, AGI, INT, VIT, SNE), and real-time HUD alerts.
+LifeOS AI is an all-in-one personal life operating system integrating daily quests/tasks, habit tracking, financial budgeting, hardware pedometer & wellness analytics, journal sentiment reflections, pinned notes, goal roadmaps, event scheduling, collaborative Hunter Guilds, and on-device predictive AI coaching. Inspired by the **Solo Leveling / Monarch System**, productive discipline fuels XP progression, Hunter Ranks, persisted attribute points (`STR`, `AGI`, `INT`, `VIT`, `SNE`), team Raid Boss damage, and real-time HUD feedback.
 
-### 📊 Milestone Progression Matrix (35% ➔ 75% ➔ 100%)
+### 📊 Full Progression Matrix (35% ➔ 75% ➔ 100% Delivered)
 
-| Milestone Dimension | Review 1 (35% Completed) | Review 2 (75% Completed - Current) | Review 3 (100% Target) |
+| Dimension | Review 1 (35%) | Review 2 (75%) | Final Release (100% — Delivered) |
 |---|---|---|---|
-| **Architecture** | Basic UI Wireframes, initial models | Clean Architecture + MVI/MVVM + Multi-tier Error Boundaries | Production-hardened Clean Architecture |
-| **Local Persistence** | Initial SQLite Room tables | **11 Room Entities & DAOs** with indices & reactive Flow | Room + SQLCipher Encrypted Database |
-| **Cloud Sync** | Static placeholders | **Firebase Firestore Real-time Sync** (user-scoped multi-tenant paths) | Offline delta-sync with conflict CRDTs |
-| **Authentication** | Mock login UI | **Google Credential Manager** + Firebase Auth + Email/Password | Biometric Fingerprint/Face Unlock |
-| **AI Integration** | Single endpoint draft | **Dual-Engine Cascade** (OpenRouter + Gemini REST + Offline Engine) | On-device local LLM execution (MediaPipe) |
-| **Gamification** | Level 1 static badge | **Dynamic Solo Leveling Engine** (XP math, Leveling, Hunter Ranks, Attribute Allocation, HUD Alerts) | Multiplayer Hunter guilds & global leaderboards |
-| **Data Visualizations** | Basic placeholders | **Custom Donut Charts, Bar Charts, Line Charts, Circular Gauges, Habit Heatmaps** | Interactive multi-year analytics trends |
-| **Backup & Migration** | Toast placeholder | **Complete JSON Export & Restoration Engine** | Encrypted Google Drive automated backups |
-| **Unit Testing** | `assertEquals(4, 2 + 2)` (1 test) | **Comprehensive Unit Testing Suite (8 Test Suites, 35+ Tests)** | 90%+ CI/CD test coverage + UI tests |
-| **Error Boundaries** | None (unhandled exceptions) | **Multi-tier Error Boundaries** (UI, ViewModel, Repository, Network, DB) | Sentry / Firebase Crashlytics live telemetry |
+| **Architecture** | Basic UI wireframes | Clean Architecture + MVI/MVVM + Error Boundaries | **Modular Clean Architecture** with Sync, AI, Export, Security & Sensor Engines |
+| **Local Persistence** | Initial Room draft | 11 Room Entities & DAOs | **12 Room Entities (`Version 4`) + `MIGRATION_3_4`** + Persisted Hunter Attributes & Guilds |
+| **Cloud Sync** | Static placeholders | Single-direction push writes | **Bidirectional Last-Write-Wins (LWW) Cloud Sync** (`CloudSyncEngine`) with delta reports |
+| **Security & Auth** | Mock UI & Basic Google Sign-In | Credential Manager + Email Auth | **Firebase Google/OAuth/Email + Salted SHA-256 PIN Vault + `BiometricPrompt` + AES-256-GCM Crypto** |
+| **AI Coaching** | Single draft prompt | OpenRouter + Gemini REST fallback | **3-Tier Cascade + On-Device Edge AI** (`EdgeAiCoachEngine`: linear burn forecast & sentiment) |
+| **Gamification** | Static Level 1 badge | Solo Leveling XP + ephemeral attributes | **Persisted Attributes + Social Hunter Guilds (`GuildScreen`) & Co-op Raid Boss Battles** |
+| **Health & Sensors** | Manual water/BMI | Basic BMI Calculator | **Hardware `TYPE_STEP_COUNTER` Bridge + Calorie Burn Estimator + 4-Pillar Vitality Index** |
+| **Reports & Exports** | Hardcoded static chart | Reports screen skeleton | **Live Room Charts + Vector `PdfDocument` Generator + RFC-4180 CSV Share (`FileProvider`)** |
+| **Background Alerts** | UI switches only | Static toggle preferences | **`NotificationScheduler` + `AlarmManager` + `ReminderReceiver` + `BOOT_COMPLETED` Recovery** |
+| **Backup & Integrity** | Toast stub | JSON Backup v2 | **Schema v3 Backup/Restore with SHA-256 Integrity Checksum Verification** |
+| **Testing & CI/CD** | 1 placeholder test | 8 unit test suites | **15 Automated Unit Test Suites + Compose UI Tests (`LifeTrackerUiTest`) + GitHub Actions CI** |
+| **Production Build** | Debug unminified | `isMinifyEnabled = false` | **R8 Code Shrinking, Resource Shrinking & Custom `proguard-rules.pro` (`v2.0.0`)** |
+| **Web Companion** | None | Partial 75% web preview | **100% Interactive Web OS (`web/index.html` + `server.py` + `run_website.bat`)** |
 
 ---
 
-## 🏗️ System Architecture
-
-LifeOS AI follows **Clean Architecture** principles and **Unidirectional Data Flow (UDF)**:
+## 🏗️ Complete System Architecture (Release 1.0)
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        PRESENTATION LAYER                              │
-│  Jetpack Compose Screens • LifeTrackerErrorBoundary • Glassmorphic UI │
-│  HUD Notifications • LevelUpOverlay • QuickAddFab • Navigation Host   │
-└────────────────────────────────────┬───────────────────────────────────┘
-                                     │ StateFlow / Events
-┌────────────────────────────────────▼───────────────────────────────────┐
-│                          VIEWMODEL LAYER                               │
-│  LifeTrackerViewModel • CoroutineExceptionHandler • State Orchestration│
-│  Solo Leveling Hunter Gamification Engine • Backup/Restore Coordinator │
-└────────────────────────────────────┬───────────────────────────────────┘
-                                     │ Suspend / Flow
-┌────────────────────────────────────▼───────────────────────────────────┐
-│                         REPOSITORY LAYER                               │
-│  LifeTrackerRepository (Single Source of Truth) • AppResult<T> Wrappers│
-│  Dual-Write: Local SQLite Cache ➔ Remote Cloud Synchronizer            │
-└──────────────────┬──────────────────────────────────┬──────────────────┘
-                   │                                  │
-┌──────────────────▼───────────────┐  ┌───────────────▼──────────────────┐
-│        LOCAL DATA LAYER          │  │        REMOTE DATA LAYER         │
-│  Room Database (11 Tables)       │  │  OpenRouter AI (Primary Engine)  │
-│  TaskDao, HabitDao, ExpenseDao   │  │  Gemini REST API (Fallback Engine│
-│  HealthDao, JournalDao, NoteDao  │  │  Offline Heuristic Engine        │
-│  GoalDao, CalendarDao, UserDao   │  │  Firebase Auth (Google One-Tap)  │
-│  UserStatsDao, CategoryDao       │  │  Firebase Cloud Firestore Sync   │
-└──────────────────────────────────┘  └──────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           PRESENTATION LAYER                                │
+│  Jetpack Compose Screens • AppLockScreen (Biometric/PIN) • GuildScreen     │
+│  Reports Studio (Live Charts + Export) • LifeTrackerErrorBoundary • HUD    │
+└────────────────────────────────────┬────────────────────────────────────────┘
+                                     │ StateFlow / UDF Events
+┌────────────────────────────────────▼────────────────────────────────────────┐
+│                           VIEWMODEL LAYER                                   │
+│  LifeTrackerViewModel • CoroutineExceptionHandler • Persisted Hunter Stats │
+│  PredictiveLifeSnapshot Builder • LWW SyncReport Coordinator               │
+└───────────────┬─────────────────────────────────────────┬───────────────────┘
+                │ Suspend / Flow                          │ Platform Engines
+┌───────────────▼────────────────────────┐ ┌──────────────▼───────────────────┐
+│         REPOSITORY & SYNC LAYER        │ │     DOMAIN & PLATFORM SERVICES   │
+│  LifeTrackerRepository                 │ │  EdgeAiCoachEngine (On-Device)   │
+│  CloudSyncEngine (LWW Reconciliation)  │ │  ReportExportEngine (PDF & CSV)  │
+│  Backup v3 (SHA-256 Tamper Check)      │ │  SecurityManager (AES-GCM & PIN) │
+└───────┬────────────────────────┬───────┘ │  NotificationScheduler & Receiver│
+        │                        │         │  HealthSensorManager (Pedometer) │
+┌───────▼───────────┐ ┌──────────▼────────┐└──────────────────────────────────┘
+│ LOCAL ROOM DB v4  │ │ REMOTE CLOUD/AI   │
+│ 12 Tables + Mig   │ │ OpenRouter +      │
+│ MIGRATION_3_4     │ │ Gemini REST +     │
+│ 12 Reactive DAOs  │ │ Firebase Auth/DB  │
+└───────────────────┘ └───────────────────┘
 ```
 
 ---
 
-## 🗄️ Granular Database Schema Documentation
+## 🗄️ Granular Database Schema Documentation (Room V4)
 
-The local database is powered by **Android Room (SQLite)**. Database Name: `life_tracker_ai_database`, Schema Version: `3`.
+Database Name: `life_tracker_ai_database` | Schema Version: `4` | Non-destructive migration `MIGRATION_3_4`.
 
 ```mermaid
 erDiagram
     CATEGORIES ||--o{ TASKS : categorizes
     CATEGORIES ||--o{ EXPENSES : classifies
     USER_PROFILE ||--|| USER_STATS : tracks
-    
+    USER_PROFILE ||--|| GUILD_PROGRESS : collaborates
+
     CATEGORIES {
         int64 id PK
         string name
         string colorHex
         string iconName
+        int64 updatedAt
     }
     TASKS {
         int64 id PK
@@ -91,6 +93,7 @@ erDiagram
         int64 reminderTime
         boolean isRecurring
         string repeatFrequency
+        int64 updatedAt
     }
     HABITS {
         int64 id PK
@@ -101,6 +104,7 @@ erDiagram
         boolean isCompletedToday
         int64 lastCompletedDate
         int32 targetDaysPerWeek
+        int64 updatedAt
     }
     EXPENSES {
         int64 id PK
@@ -110,6 +114,7 @@ erDiagram
         string category
         int64 date
         string notes
+        int64 updatedAt
     }
     HEALTH_LOGS {
         int64 id PK
@@ -123,6 +128,7 @@ erDiagram
         string mood
         int32 workoutDurationMins
         string workoutType
+        int64 updatedAt
     }
     JOURNAL_ENTRIES {
         int64 id PK
@@ -133,6 +139,7 @@ erDiagram
         string tags
         string photoUri
         string voiceNoteSnippet
+        int64 updatedAt
     }
     NOTES {
         int64 id PK
@@ -153,6 +160,7 @@ erDiagram
         int32 progressPercent
         int64 deadline
         string milestones
+        int64 updatedAt
     }
     CALENDAR_EVENTS {
         int64 id PK
@@ -162,6 +170,7 @@ erDiagram
         int64 endTime
         string eventType
         string location
+        int64 updatedAt
     }
     USER_PROFILE {
         int32 id PK
@@ -173,6 +182,7 @@ erDiagram
         int32 dailyStepGoal
         float64 monthlyBudget
         int32 avatarId
+        int64 updatedAt
     }
     USER_STATS {
         int32 id PK
@@ -180,330 +190,116 @@ erDiagram
         int32 level
         int32 coins
         int32 streakDays
+        int32 strength
+        int32 agility
+        int32 intelligence
+        int32 vitality
+        int32 sense
+        int32 unallocatedPoints
+        int64 updatedAt
+    }
+    GUILD_PROGRESS {
+        int32 id PK
+        string guildName
+        string guildMotto
+        string raidBossName
+        int32 raidBossHp
+        int32 raidDamageDealt
+        int32 personalContributionXp
         int64 updatedAt
     }
 ```
 
-### Table Definitions & Constraints
+---
 
-#### 1. `categories`
-- `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`): Unique category identifier.
-- `name` (`TEXT NOT NULL`): Category label (e.g., Work, Health, Finance).
-- `colorHex` (`TEXT NOT NULL DEFAULT '#3B82F6'`): Visual theme color.
-- `iconName` (`TEXT NOT NULL DEFAULT 'Folder'`): Vector icon reference.
+## ⚙️ Core Release 1.0 Modules & Technical Specifications
 
-#### 2. `tasks`
-- `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`): Unique quest identifier.
-- `title` (`TEXT NOT NULL`): Quest / task name.
-- `description` (`TEXT NOT NULL DEFAULT ''`): Sub-steps and instructions.
-- `isCompleted` (`INTEGER NOT NULL DEFAULT 0`): Boolean completion flag.
-- `priority` (`TEXT NOT NULL DEFAULT 'Medium'`): "High" (100 XP), "Medium" (50 XP), "Low" (25 XP).
-- `category` (`TEXT NOT NULL DEFAULT 'Personal'`): Grouping tag.
-- `categoryId` (`INTEGER NOT NULL DEFAULT 1`): Category ID foreign reference.
-- `dueDate` (`INTEGER NOT NULL`): Epoch timestamp (ms).
-- `reminderTime` (`INTEGER NOT NULL DEFAULT 0`): Alert timestamp (ms).
-- `isRecurring` (`INTEGER NOT NULL DEFAULT 0`): Periodic repetition flag.
-- `repeatFrequency` (`TEXT NOT NULL DEFAULT 'None'`): "Daily", "Weekly", "Monthly", "None".
-- **Indices:** `Index(dueDate)`, `Index(isCompleted)` for sub-millisecond query performance.
+### 1. Bidirectional Cloud Sync & LWW Conflict Resolution (`CloudSyncEngine.kt`)
+- Pulls multi-tenant documents via `FirestoreManager.fetchUserCollection("users/{sanitizedEmail}/{collection}")`.
+- Compares `local.updatedAt` vs `remote.updatedAt` per record ID:
+  - Missing remotely ➔ queued to `toPushRemotely`.
+  - Missing locally ➔ pulled to `toSaveLocally`.
+  - Both exist with differing timestamps ➔ newer `updatedAt` wins (`conflictsResolved` tracked in `SyncReport`).
 
-#### 3. `habits`
-- `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`): Unique habit identifier.
-- `name` (`TEXT NOT NULL`): Habit title (e.g., "Mindfulness Meditation").
-- `category` (`TEXT NOT NULL DEFAULT 'Health'`): Habit domain.
-- `frequency` (`TEXT NOT NULL DEFAULT 'Daily'`): Recurrence cycle.
-- `streakCount` (`INTEGER NOT NULL DEFAULT 0`): Consecutive active periods.
-- `isCompletedToday` (`INTEGER NOT NULL DEFAULT 0`): Daily check state.
-- `lastCompletedDate` (`INTEGER NOT NULL DEFAULT 0`): Last check timestamp (ms).
-- `targetDaysPerWeek` (`INTEGER NOT NULL DEFAULT 7`): Target frequency.
+### 2. On-Device Edge AI Coach (`EdgeAiCoachEngine.kt` & `GeminiApiService.kt`)
+- **Tier 1:** OpenRouter (`google/gemini-2.5-flash`) with enriched live metrics context.
+- **Tier 2:** Google Gemini REST API (`gemini-2.5-flash:generateContent`).
+- **Tier 3 (Edge AI):** Zero-latency on-device analytics predicting monthly overspend via linear burn-rate projection (`forecastBudget`), scoring journal reflections via lexicon polarity (`analyzeJournalSentimentScore`), routing query intents (`FINANCE`, `FITNESS`, `HABITS`, `TASKS`, `JOURNAL`, `GENERAL`), and protecting high habit streaks.
 
-#### 4. `expenses`
-- `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`): Transaction ID.
-- `title` (`TEXT NOT NULL`): Merchant or description.
-- `amount` (`REAL NOT NULL`): Numeric currency value in USD.
-- `type` (`TEXT NOT NULL DEFAULT 'Expense'`): "Expense" or "Income".
-- `category` (`TEXT NOT NULL DEFAULT 'General'`): Budget bucket ("Food", "Bills", "Shopping", "Health").
-- `date` (`INTEGER NOT NULL`): Transaction timestamp (ms).
-- `notes` (`TEXT NOT NULL DEFAULT ''`): Receipt remarks.
-- **Indices:** `Index(date)`, `Index(category)`.
+### 3. Security Vault, Encryption & Biometrics (`SecurityManager.kt` & `AppLockScreen.kt`)
+- **PIN Protection:** 16-byte cryptographic salt + SHA-256 constant-time verification (`MessageDigest.isEqual`).
+- **Hardware Biometrics:** Android `BiometricPrompt` & `BiometricManager` bridge (API 28+).
+- **AES-256-GCM Cryptography:** `AndroidKeyStore` field encryption + PBKDF2-HMAC-SHA256 AES-GCM passphrase encryption + SHA-256 tamper checksums verified during Backup v3 restoration.
 
-#### 5. `health_logs`
-- `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`): Metric snapshot ID.
-- `date` (`INTEGER NOT NULL`): Log date timestamp (ms).
-- `waterIntakeMl` (`INTEGER NOT NULL DEFAULT 0`): Cumulative hydration in ml (goal: 2500 ml).
-- `sleepHours` (`REAL NOT NULL DEFAULT 0.0`): Hours of sleep.
-- `weightKg` (`REAL NOT NULL DEFAULT 0.0`): Body mass in kilograms.
-- `heightCm` (`REAL NOT NULL DEFAULT 175.0`): Body height for dynamic BMI calculation.
-- `stepsCount` (`INTEGER NOT NULL DEFAULT 0`): Daily step tally.
-- `caloriesBurned` (`INTEGER NOT NULL DEFAULT 0`): Estimated caloric expenditure.
-- `mood` (`TEXT NOT NULL DEFAULT '😊 Happy'`): Emotional status emoji.
-- `workoutDurationMins` (`INTEGER NOT NULL DEFAULT 0`): Exercise duration.
-- `workoutType` (`TEXT NOT NULL DEFAULT 'General Workout'`): Activity description.
+### 4. Vector PDF & RFC-4180 CSV Export Engine (`ReportExportEngine.kt` & `ReportsScreen.kt`)
+- Live Room calculations replace static mock charts in `ReportsScreen`.
+- Generates A4 multi-line PDF files with `android.graphics.pdf.PdfDocument` and RFC-4180 quoted CSV ledgers shared safely via `FileProvider` (`@xml/file_paths.xml`).
 
-#### 6. `journal_entries`
-- `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`): Entry ID.
-- `title` (`TEXT NOT NULL`): Reflection headline.
-- `content` (`TEXT NOT NULL`): Detailed reflective text.
-- `date` (`INTEGER NOT NULL`): Composition timestamp (ms).
-- `moodTag` (`TEXT NOT NULL DEFAULT 'Calm'`): Sentiment category.
-- `tags` (`TEXT NOT NULL DEFAULT 'Personal'`): Comma-separated tags.
-- `photoUri` (`TEXT NULL`): Local image snapshot path.
-- `voiceNoteSnippet` (`TEXT NULL`): Audio voice note transcription.
-
-#### 7. `notes`
-- `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`): Note identifier.
-- `title` (`TEXT NOT NULL`): Note subject.
-- `content` (`TEXT NOT NULL`): Note body or checklist items.
-- `isChecklist` (`INTEGER NOT NULL DEFAULT 0`): Interactive checklist mode flag.
-- `checklistItems` (`TEXT NOT NULL DEFAULT ''`): Serialized items list.
-- `isPinned` (`INTEGER NOT NULL DEFAULT 0`): Sticky note prioritization flag.
-- `folder` (`TEXT NOT NULL DEFAULT 'General'`): Organizational folder.
-- `updatedAt` (`INTEGER NOT NULL`): Mutation timestamp (ms).
-- **Indices:** `Index(isPinned, updatedAt)` for fast pin-sorting.
-
-#### 8. `goals`
-- `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`): Goal ID.
-- `title` (`TEXT NOT NULL`): Target objective.
-- `description` (`TEXT NOT NULL DEFAULT ''`): Roadmap and rationale.
-- `category` (`TEXT NOT NULL DEFAULT 'Career'`): Domain.
-- `type` (`TEXT NOT NULL DEFAULT 'Short-term'`): "Short-term" or "Long-term".
-- `progressPercent` (`INTEGER NOT NULL DEFAULT 0`): 0 to 100% progress.
-- `deadline` (`INTEGER NOT NULL`): Target completion timestamp (ms).
-- `milestones` (`TEXT NOT NULL DEFAULT ''`): Pipe-separated sub-goals.
-
-#### 9. `calendar_events`
-- `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`): Event ID.
-- `title` (`TEXT NOT NULL`): Event title.
-- `description` (`TEXT NOT NULL DEFAULT ''`): Agenda summary.
-- `startTime` (`INTEGER NOT NULL`): Event start timestamp (ms).
-- `endTime` (`INTEGER NOT NULL`): Event end timestamp (ms).
-- `eventType` (`TEXT NOT NULL DEFAULT 'Event'`): "Event", "Birthday", "Reminder", "Task".
-- `location` (`TEXT NOT NULL DEFAULT ''`): Physical location or meeting link.
-- **Indices:** `Index(startTime)`.
-
-#### 10. `user_profile`
-- `id` (`INTEGER PRIMARY KEY DEFAULT 1`): Singleton ID = 1.
-- `name` (`TEXT NOT NULL DEFAULT 'Alex Rivera'`): User profile display name.
-- `email` (`TEXT NOT NULL DEFAULT ''`): Connected Google Account email.
-- `isDarkMode` (`INTEGER NOT NULL DEFAULT 1`): UI Theme preference.
-- `dailyWaterGoalMl` (`INTEGER NOT NULL DEFAULT 2500`): Water intake goal in ml.
-- `dailyCalorieGoal` (`INTEGER NOT NULL DEFAULT 2200`): Calorie target.
-- `dailyStepGoal` (`INTEGER NOT NULL DEFAULT 10000`): Target daily steps.
-- `monthlyBudget` (`REAL NOT NULL DEFAULT 3000.0`): Monthly spending threshold.
-- `avatarId` (`INTEGER NOT NULL DEFAULT 1`): Avatar style index.
-
-#### 11. `user_stats`
-- `id` (`INTEGER PRIMARY KEY DEFAULT 1`): Singleton ID = 1.
-- `totalXp` (`INTEGER NOT NULL DEFAULT 2450`): Cumulative Experience Points.
-- `level` (`INTEGER NOT NULL DEFAULT 5`): Calculated Level = `(totalXp / 500) + 1`.
-- `coins` (`INTEGER NOT NULL DEFAULT 450`): System currency (`XP / 5`).
-- `streakDays` (`INTEGER NOT NULL DEFAULT 21`): Unbroken continuous activity streak.
-- `updatedAt` (`INTEGER NOT NULL`): Timestamp of last level/stat mutation.
+### 5. Hardware Pedometer & Smart Reminders (`HealthSensorManager.kt`, `NotificationScheduler.kt`, `ReminderReceiver.kt`)
+- Subscribes to Android `Sensor.TYPE_STEP_COUNTER`, computes active caloric expenditure, and calculates the 4-pillar **Composite Vitality Score (0–100)**.
+- Schedules recurring alarms via `AlarmManager` across 4 NotificationChannels with `BOOT_COMPLETED` recovery.
 
 ---
 
-## 🌐 API Endpoints & Network Architecture
+## 🧪 Automated Test Matrix & CI/CD
 
-LifeOS AI incorporates a resilient multi-tier remote architecture combining Generative AI and Google Cloud Firestore:
+### Unit Test Suites (`app/src/test/java/com/example/`) — 15 Suites
+| Test Suite | Coverage Target |
+|---|---|
+| **`ConflictResolutionSyncTest.kt`** | Bidirectional LWW cloud vs local resolution & equality convergence |
+| **`EdgeAiCoachEngineTest.kt`** | Intent classifier, linear budget burn forecast, journal sentiment polarity |
+| **`ReportExportEngineTest.kt`** | RFC-4180 CSV quoting, live efficiency weights, expense slicing, summary formatting |
+| **`SecurityEncryptionTest.kt`** | Salted SHA-256 PIN verification, SHA-256 backup checksum, PBKDF2 + AES-GCM crypto |
+| **`SocialGuildTest.kt`** | Guild Rank tiers, Raid Boss % clamping, leaderboard XP/streak tie-breakers |
+| **`VitalitySensorAnalyticsTest.kt`** | Step/workout calorie burn math & 4-pillar Vitality Wellness Index |
+| **`GamificationModelTest.kt`** | Solo Leveling XP math, Hunter Rank thresholds, attribute points & badges |
+| **`ErrorBoundaryTest.kt`** | Sealed `AppResult<T>`, `safeApiCall` timeout/IO isolation, exception hierarchy |
+| **`BackupRestoreTest.kt`** | Backup JSON schema persistence, default fallback recovery & corrupt input safety |
+| **`BmiCalculatorTest.kt`** | WHO BMI brackets and zero/negative safety guards |
+| **`TaskScreenLogicTest.kt`** | Priority/category filters, search matching, XP reward tiers |
+| **`HabitLogicTest.kt`** | Daily streak increment/decrement safety & completion percentages |
+| **`ExpenseLogicTest.kt`** | Net balance arithmetic, budget alert thresholds, category grouping |
+| **`GeminiApiServiceTest.kt`** | OpenRouter/Gemini JSON payload constructors & offline coach output |
+| **`ExampleRobolectricTest.kt` / `GreetingScreenshotTest.kt`** | App context strings (`LifeOS AI`) & Roborazzi UI screenshot verification |
 
-### 1. Primary AI Engine: OpenRouter API
-- **Endpoint URL:** `POST https://openrouter.ai/api/v1/chat/completions`
-- **Model:** `google/gemini-2.5-flash`
-- **Headers:**
-  - `Authorization: Bearer <PRIMARY_API_KEY>`
-  - `Content-Type: application/json`
-  - `HTTP-Referer: https://lifetracker.ai`
-  - `X-Title: Life Tracker AI`
-- **Request Payload Schema:**
-  ```json
-  {
-    "model": "google/gemini-2.5-flash",
-    "messages": [
-      {
-        "role": "system",
-        "content": "You are 'Life Tracker AI', an empathetic, high-performance life coach and personal management AI. Keep responses crisp, actionable, inspiring, and nicely formatted with bullet points and bold headers."
-      },
-      {
-        "role": "user",
-        "content": "<Enriched contextual metrics including tasks, habits, expenses, and health>"
-      }
-    ]
-  }
-  ```
-- **Response Handling:** Parses `choices[0].message.content` with fallback on timeout/failure.
+### Compose Instrumented UI Tests (`app/src/androidTest/java/com/example/`)
+- **`LifeTrackerUiTest.kt`:** Automated UI tests covering `LifeTrackerErrorBoundary` retry recovery, `TaskScreen` filtering, `HealthScreen` water & pedometer actions, `ReportsScreen` PDF/CSV Export Studio modal, `GuildScreen` raid strikes, and `AppLockScreen` PIN rejection/unlock flows.
 
-### 2. Secondary AI Fallback: Google Gemini REST API
-- **Endpoint URL:** `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=<GEMINI_API_KEY>`
-- **Request Payload Schema:**
-  ```json
-  {
-    "contents": [
-      {
-        "parts": [{ "text": "<Contextual prompt>" }]
-      }
-    ],
-    "systemInstruction": {
-      "parts": [{ "text": "You are 'Life Tracker AI'..." }]
-    }
-  }
-  ```
-- **Response Handling:** Parses `candidates[0].content.parts[0].text`.
-
-### 3. Offline Heuristic AI Engine
-When device connectivity is severed, the app triggers `generateOfflineFallbackResponse()` which synthesizes deterministic life coaching advice from current Room database metrics without stalling the UI.
-
-### 4. Firebase Authentication
-- **Provider 1:** Android Credential Manager One-Tap Google Sign-In (`GetCredentialRequest` with `GetGoogleIdOption`).
-- **Provider 2:** Firebase Email/Password Sign-In (`signInWithEmailAndPassword` / `createUserWithEmailAndPassword`).
-- **Token Exchange:** Exchanged with `GoogleAuthProvider.getCredential(idToken)` for verified Firebase user sessions.
-
-### 5. Firebase Cloud Firestore Synchronizer
-- **Multi-Tenant User Paths:**
-  - `users/{sanitizedEmail}/tasks/{taskId}`
-  - `users/{sanitizedEmail}/habits/{habitId}`
-  - `users/{sanitizedEmail}/expenses/{expenseId}`
-  - `users/{sanitizedEmail}/health_logs/{logId}`
-  - `users/{sanitizedEmail}/profile/user_profile`
-  - `users/{sanitizedEmail}/stats/user_stats`
-- **Synchronization Policy:** Optimistic write to local Room database first (zero latency), followed by asynchronous cloud merge (`SetOptions.merge()`).
-
----
-
-## 🛡️ Error Boundaries & Fault Tolerance Architecture
-
-To address the reviewer's request for **granular technical documentation on error boundaries**, LifeOS AI implements a 5-tier fault isolation architecture:
-
-```mermaid
-flowchart TD
-    A["User Action / UI Render"] --> B["Tier 1: UI Composable Error Boundary\n(LifeTrackerErrorBoundary)"]
-    B -->|Normal Flow| C["Tier 2: ViewModel Scope\n(CoroutineExceptionHandler)"]
-    B -->|UI Render Exception| B1["Render Error Boundary Alert Card\nwith 'Retry & Recover' Button"]
-    
-    C -->|Normal Execution| D["Tier 3: Repository Boundaries\n(safeApiCall & safeDbCall)"]
-    C -->|Uncaught Thread Crash| C1["Catch Exception, Update _systemError State,\nBroadcast System Alert"]
-    
-    D -->|Database Query| E["Tier 4: SQLite Database Boundary"]
-    E -->|Success| E1["Return AppResult.Success(data)"]
-    E -->|SQLiteException| E2["Catch in safeDbCall, Wrap in DatabaseSyncException"]
-    
-    D -->|Remote AI Request| F["Tier 5: 3-Tier AI Fallback Cascade"]
-    F --> F1["Try 1: OpenRouter API\n(google/gemini-2.5-flash)"]
-    F1 -->|Success| F1Success["Return AI Response"]
-    F1 -->|Timeout / HTTP Error| F2["Try 2: Fallback Gemini REST API\n(generativelanguage API)"]
-    F2 -->|Success| F2Success["Return AI Response"]
-    F2 -->|Unreachable / Offline| F3["Try 3: Offline Heuristic Engine\n(Deterministic Coaching Output)"]
-```
-
-### Granular Error Boundary Details:
-1. **Composable Error Boundary (`LifeTrackerErrorBoundary.kt`):**
-   - Intercepts state errors and unhandled screen rendering exceptions.
-   - Replaces crashed UI with an informative diagnostic card and an interactive **"Retry & Recover System"** button.
-2. **ViewModel Coroutine Exception Handler (`createViewModelExceptionHandler`):**
-   - Attached to `viewModelScope.launch(exceptionHandler)` for all background mutations.
-   - Prevents unhandled coroutine cancellations from terminating the app process.
-   - Pushes error strings into `_systemError: StateFlow<String?>` for observable error handling.
-3. **Repository Safe Call Wrappers (`safeApiCall` & `safeDbCall`):**
-   - Converts raw network and database exceptions into strongly-typed `AppResult<T>` (`Success`, `Error`, `Loading`).
-   - Specifically isolates `SocketTimeoutException` and `IOException` into `NetworkUnavailableException`.
-   - Isolates `android.database.sqlite.SQLiteException` into `DatabaseSyncException`.
-4. **AI Cascade Resilience:**
-   - 30-second connection, read, and write timeouts via configured `OkHttpClient`.
-   - Never leaves the AI Chat tab in an infinite loading spinner; auto-engages offline heuristics.
-5. **JSON Backup & Restore Boundary:**
-   - Validates JSON schema before clearing or overwriting tables.
-   - If corrupted or malformed JSON is uploaded, the transaction is rejected with `Result.failure()` and zero data loss.
-
----
-
-## 🧪 Comprehensive Unit Testing Suite Documentation
-
-The unit testing suite has been upgraded from a single placeholder test to an 8-suite automated test matrix verifying data integrity, calculations, error boundaries, and serialization:
-
-| Test Suite File | Coverage Target | Key Test Cases |
-|---|---|---|
-| **`GamificationModelTest.kt`** | RPG leveling & Monarch System | • `calculateLevel_returnsExpectedLevelsForXpThresholds`<br>• `calculateRank_returnsCorrectHunterRankBoundaries`<br>• `calculateLevelTitle_returnsAccurateTitleProgression`<br>• `hunterStats_statAllocation_incrementsAttributeAndDeductsPoints`<br>• `defaultAchievementBadges_containsAllRequiredBadgeCategories`<br>• `gamificationProfile_progressCalculations_areAccurate` |
-| **`BmiCalculatorTest.kt`** | Health metrics & BMI calculation | • `calculateBmi_underweightClassification`<br>• `calculateBmi_normalWeightClassification`<br>• `calculateBmi_overweightClassification`<br>• `calculateBmi_obeseClassification`<br>• `calculateBmi_zeroOrNegativeInputs_returnsUnknownSafeResult` |
-| **`TaskScreenLogicTest.kt`** | Task filtering, search, & XP | • `filterTasks_matchesPriorityCorrectly`<br>• `filterTasks_matchesCategoryCorrectly`<br>• `filterTasks_searchQuery_matchesTitleOrCategoryCaseInsensitive`<br>• `taskXpReward_calculatesHigherForHighPriority` |
-| **`HabitLogicTest.kt`** | Daily duty streaks & math | • `toggleHabitToday_incrementsStreakCorrectly`<br>• `toggleHabitToday_uncheckingDecrementsStreakSafelyWithoutNegative`<br>• `habitCompletionPercent_calculatesAccurately`<br>• `habitXpBonus_increasesWithStreakLength` |
-| **`ExpenseLogicTest.kt`** | Financial calculations & budget | • `financialTotals_calculatesIncomeExpenseAndNetBalance`<br>• `budgetDifference_detectsExceededOrSafeBudget`<br>• `categoryGrouping_aggregatesSpendingPerCategory` |
-| **`GeminiApiServiceTest.kt`** | AI payloads & offline engine | • `generateOfflineFallbackResponse_returnsStructuredLifeCoaching`<br>• `buildOpenRouterRequestBody_constructsValidSchema`<br>• `buildGeminiRequestBody_constructsValidContentsPayload` |
-| **`ErrorBoundaryTest.kt`** | Error handling & fault isolation | • `appResult_successState_unwrapsCorrectly`<br>• `appResult_errorState_containsExceptionAndMessage`<br>• `appResult_loadingState_returnsNullOnUnwrap`<br>• `safeApiCall_successfulExecution_returnsAppResultSuccess`<br>• `safeApiCall_catchesSocketTimeoutException_wrapsInNetworkException`<br>• `safeApiCall_catchesIOException_wrapsInNetworkException`<br>• `domainExceptions_maintainInheritanceHierarchy` |
-| **`BackupRestoreTest.kt`** | JSON export & schema restoration | • `backupJsonSchema_containsMandatoryRootMetadata`<br>• `taskJsonSerialization_preservesAllEntityProperties`<br>• `restoreParser_handlesCorruptPayloadGracefully`<br>• `restoreParser_recoversDefaultsWhenOptionalFieldsOmitted` |
-
-### Running Unit Tests
-
-Execute all local unit tests via Gradle:
+### Running Tests Locally or via CI
+GitHub Actions automatically runs all unit tests and builds the Debug APK on every push via [`.github/workflows/android-ci.yml`](.github/workflows/android-ci.yml):
 ```bash
-./gradlew test
-```
-Or run specific test suites:
-```bash
-./gradlew testDebugUnitTest --tests "com.example.GamificationModelTest"
-./gradlew testDebugUnitTest --tests "com.example.ErrorBoundaryTest"
+gradle testDebugUnitTest --stacktrace
+gradle assembleDebug --stacktrace
 ```
 
 ---
 
-## 🎮 Solo Leveling / Monarch System Gamification Engine
+## 🌐 Instant Local Web Dashboard Companion
 
-LifeOS AI includes an RPG progression framework designed to reward personal growth:
-- **Hunter XP:** Earned for clearing quests (Tasks: 25–100 XP), maintaining daily duties (Habits: 50+ XP), and logging health metrics.
-- **Hunter Ranks:**
-  - `E-Rank Hunter` (Level 1–2)
-  - `D-Rank Hunter` (Level 3–5)
-  - `C-Rank Hunter` (Level 6–9)
-  - `B-Rank Hunter` (Level 10–14)
-  - `A-Rank Hunter` (Level 15–19)
-  - `S-Rank Hunter` (Level 20–29)
-  - `National Level Hunter` (Level 30–44)
-  - `Shadow Monarch` (Level 45+)
-- **Attribute Points (STR, AGI, INT, VIT, SNE):** Each level-up awards 3 stat points that users allocate to physical strength, agility streaks, intelligence, vitality, and mindfulness.
-- **Dynamic Island HUD Pill:** Delivers animated toasts when quests are cleared and experience points are granted.
-- **Level-Up Overlay:** Fullscreen celebration overlay triggered upon ascending to a new Hunter Rank.
-
----
-
-## 🚀 Setup & Installation Guide
-
-### Prerequisites
-- Android Studio Ladybug (2024.2+) or newer
-- JDK 17 or JDK 21
-- Android SDK 36 (Android 16 preview) with minSdk 24 (Android 7.0+)
-
-### Setup Steps
-1. **Clone the Repository:**
+To showcase every feature immediately in any browser without launching Android Studio:
+1. Run `run_website.bat` (Windows 1-click launcher) or:
    ```bash
-   git clone https://github.com/thiraviyarajr2007-dotcom/Life-Tracker-Ai.git
+   py server.py
+   ```
+2. Open **`http://localhost:8000`** (or open `web/index.html` directly).
+3. Includes all 14 tabs: Dashboard, Quests/Tasks, Habits, Treasury Charts, Vitality & Pedometer, Journal Sentiment & Reflections, Pinned Notes, Interactive Goal Sliders, Clickable Calendar Agenda, Hunter Guilds & Raid Bosses, Edge AI Coach, Live CSV/PDF Export Reports, Hunter Attributes, and Security Vault PIN Lock + Bidirectional LWW Sync.
+
+---
+
+## 🚀 Setup & Release Build Instructions
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/sriramk07/Life-Tracker-Ai.git
    cd Life-Tracker-Ai
    ```
-2. **Configure API Secrets:**
-   Copy `.env.example` to `.env`:
+2. **Configure API keys:** Copy `.env.example` to `.env` (and optionally add `PRIMARY_API_KEY` / `GEMINI_API_KEY`).
+3. **Open in Android Studio (Ladybug+ / JDK 17+ / SDK 36):** Sync Gradle and run `app` on an emulator or physical Android device (`minSdk = 24`).
+4. **Build R8-Minified Production Release APK:**
    ```bash
-   cp .env.example .env
+   gradle assembleRelease
    ```
-   Add your API keys:
-   ```env
-   PRIMARY_API_KEY=sk-or-v1-your-openrouter-key
-   GEMINI_API_KEY=your-gemini-api-key
-   ```
-3. **Build the Project:**
-   ```bash
-   ./gradlew assembleDebug
-   ```
-4. **Deploy to Device / Emulator:**
-   Connect an Android device with USB debugging enabled, then run:
-   ```bash
-   ./gradlew installDebug
-   ```
+   *(Configured with `isMinifyEnabled = true`, `isShrinkResources = true`, and custom rules in `app/proguard-rules.pro`.)*
 
 ---
-
-## 📈 Roadmap to 100% (Review 3 Final Release)
-- [ ] On-device MediaPipe / Gemini Nano local LLM offline inference.
-- [ ] Wear OS companion app for smartwatch biometric sensor synchronization.
-- [ ] Biometric authentication (Fingerprint / Face Unlock) for secure journal encryption.
-- [ ] SQLCipher database encryption at rest.
-- [ ] Google Drive automated scheduled cloud backups.
-- [ ] Google Play Store production release bundle.
-
----
-*LifeOS AI — Built with passion for high-performance personal mastery.*
+*LifeOS AI — Release 1.0 (100% Complete) • Built for Personal Mastery.*

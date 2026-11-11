@@ -1,6 +1,8 @@
 package com.example.data.remote
 
 import android.util.Log
+import com.example.domain.ai.EdgeAiCoachEngine
+import com.example.domain.ai.PredictiveLifeSnapshot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -13,17 +15,17 @@ import java.util.concurrent.TimeUnit
 
 /**
  * ============================================================================
- * GEMINI API SERVICE — DUAL-ENGINE AI INFERENCE CLIENT
+ * GEMINI API SERVICE — 3-TIER AI & ON-DEVICE EDGE INFERENCE CLIENT
  * ============================================================================
  *
- * Implements a resilient 3-tier cascade for generative life coaching:
+ * Implements a resilient cascade for generative life coaching:
  * 1. Primary Engine: OpenRouter AI (`https://openrouter.ai/api/v1/chat/completions`)
  *    using `google/gemini-2.5-flash` with system prompt conditioning.
  * 2. Fallback Engine: Google Gemini REST API
  *    (`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`)
  *    activated automatically if OpenRouter returns non-200 or times out.
- * 3. Offline Heuristic Engine: Deterministic rule-based life coach that provides
- *    actionable recommendations when network connectivity is lost.
+ * 3. On-Device Edge AI Engine ([EdgeAiCoachEngine]): Computes real-time trend
+ *    projections, sentiment scores, and intent-routed advice offline at zero cost.
  */
 class GeminiApiService {
     private val client = OkHttpClient.Builder()
@@ -36,12 +38,13 @@ class GeminiApiService {
     private val primaryApiKeyFallback = "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"
 
     /**
-     * Executes AI prompt evaluation through the multi-tier error-bounded cascade.
-     *
-     * @param prompt The enriched life metrics context and user query.
-     * @return Formatted AI response string with recommendations and bullet points.
+     * Executes AI prompt evaluation through the multi-tier error-bounded cascade,
+     * falling back to on-device [EdgeAiCoachEngine] using live [snapshot] metrics if offline.
      */
-    suspend fun generateAiResponse(prompt: String): String = withContext(Dispatchers.IO) {
+    suspend fun generateAiResponse(
+        prompt: String,
+        snapshot: PredictiveLifeSnapshot? = null
+    ): String = withContext(Dispatchers.IO) {
         val primaryKeyFromEnv = getBuildConfigField("PRIMARY_API_KEY")
         val primaryKey = if (primaryKeyFromEnv.isNotBlank() && primaryKeyFromEnv != "MY_PRIMARY_API_KEY") {
             primaryKeyFromEnv
@@ -51,7 +54,7 @@ class GeminiApiService {
 
         val geminiKey = getBuildConfigField("GEMINI_API_KEY")
 
-        // 1. TRY PRIMARY API (OpenRouter with primary API key)
+        // 1. TRY PRIMARY API (OpenRouter)
         Log.d("GeminiApiService", "Attempting primary AI call via OpenRouter...")
         val primaryResult = tryOpenRouterPrimary(prompt, primaryKey)
         if (primaryResult != null) {
@@ -68,14 +71,17 @@ class GeminiApiService {
             }
         }
 
-        // 3. OFFLINE ENGINE FALLBACK
-        Log.w("GeminiApiService", "Both Primary and Fallback APIs unreachable. Returning offline engine response.")
-        return@withContext generateOfflineFallbackResponse(prompt)
+        // 3. ON-DEVICE EDGE AI ENGINE FALLBACK
+        Log.w("GeminiApiService", "Cloud endpoints unreachable. Engaging on-device Edge AI engine.")
+        return@withContext if (snapshot != null) {
+            EdgeAiCoachEngine.generateEdgeCoaching(prompt, snapshot)
+        } else {
+            generateOfflineFallbackResponse(prompt)
+        }
     }
 
     /**
      * Constructs the JSON payload for the OpenRouter Chat Completions endpoint.
-     * Exposed as internal for unit testing validation.
      */
     internal fun buildOpenRouterRequestBody(prompt: String): JSONObject {
         return JSONObject().apply {
@@ -94,9 +100,6 @@ class GeminiApiService {
         }
     }
 
-    /**
-     * Calls OpenRouter OpenAI-compatible endpoint with system coaching instructions.
-     */
     private fun tryOpenRouterPrimary(prompt: String, apiKey: String): String? {
         if (apiKey.isBlank()) return null
 
@@ -138,7 +141,6 @@ class GeminiApiService {
 
     /**
      * Constructs the JSON payload for the Google Generative Language REST endpoint.
-     * Exposed as internal for unit testing validation.
      */
     internal fun buildGeminiRequestBody(prompt: String): JSONObject {
         return JSONObject().apply {
@@ -165,9 +167,6 @@ class GeminiApiService {
         }
     }
 
-    /**
-     * Calls Google Generative Language REST API as secondary fallback.
-     */
     private fun tryGeminiFallback(prompt: String, apiKey: String): String? {
         try {
             val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
@@ -203,18 +202,17 @@ class GeminiApiService {
     /**
      * Offline heuristic life coaching engine.
      * Generates structured guidance when internet connectivity is disconnected.
-     *
-     * @param prompt The input context from the user.
-     * @return Deterministic offline life optimization recommendations.
      */
     fun generateOfflineFallbackResponse(prompt: String): String {
+        val edgeInsight = EdgeAiCoachEngine.generateEdgeCoaching(prompt, PredictiveLifeSnapshot())
         return "💡 [Life Tracker AI Recommendations]\n" +
                 "• **Primary API Engine:** Active (`sk-or-v1-...`)\n" +
                 "• **Fallback Gemini API:** Standby ready\n\n" +
                 "Automated Life Coaching Summary:\n" +
                 "• **Productivity:** Break large tasks into 25-minute Pomodoro sessions.\n" +
                 "• **Health:** Maintain daily hydration targets (2.5L) and consistent sleep schedules.\n" +
-                "• **Finance:** Track daily expenses against monthly budgets."
+                "• **Finance:** Track daily expenses against monthly budgets.\n\n" +
+                edgeInsight
     }
 
     private fun getBuildConfigField(fieldName: String): String {

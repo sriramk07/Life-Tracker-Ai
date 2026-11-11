@@ -8,18 +8,20 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 
 /**
  * ============================================================================
- * FIRESTORE MANAGER — REAL-TIME CLOUD DATA SYNCHRONIZATION CLIENT
+ * FIRESTORE MANAGER — BIDIRECTIONAL CLOUD DATA SYNCHRONIZATION CLIENT
  * ============================================================================
  *
- * Provides cloud persistence and real-time syncing for LifeOS AI:
+ * Provides cloud persistence, bidirectional delta fetching, and real-time
+ * syncing for LifeOS AI:
  * 1. User-scoped document paths (`users/{sanitizedEmail}/{collectionName}/{docId}`)
  *    ensuring multi-tenant security and zero cross-account data leakage.
- * 2. Real-time Reactive Streams via [callbackFlow] and snapshot listeners.
- * 3. Graceful offline mode with merge options for seamless re-connection.
- * 4. Error boundaries handling permission denied or initialization faults.
+ * 2. One-shot suspending collection pull ([fetchUserCollection]) for LWW merge.
+ * 3. Real-time Reactive Streams via [callbackFlow] and snapshot listeners.
+ * 4. Error boundaries handling permission denied, offline mode, or init faults.
  */
 class FirestoreManager {
 
@@ -31,6 +33,34 @@ class FirestoreManager {
             Log.e("FirestoreManager", "Firestore instance error boundary caught: ${e.message}")
             null
         }
+
+    /**
+     * Fetches all documents in a user-scoped Firestore subcollection for
+     * bidirectional Last-Write-Wins conflict reconciliation.
+     *
+     * @param userEmail Authenticated user email partitioning cloud storage.
+     * @param collectionName Subcollection name (e.g., "tasks", "habits").
+     * @return List of document property maps augmented with `"id"`.
+     */
+    suspend fun fetchUserCollection(
+        userEmail: String,
+        collectionName: String
+    ): List<Map<String, Any>> {
+        val firestore = db ?: return emptyList()
+        if (userEmail.isBlank()) return emptyList()
+
+        return try {
+            val sanitizedEmail = sanitizeEmail(userEmail)
+            val path = "users/$sanitizedEmail/$collectionName"
+            val snapshot = firestore.collection(path).get().await()
+            snapshot.documents.mapNotNull { doc ->
+                doc.data?.plus("id" to doc.id)
+            }
+        } catch (e: Exception) {
+            Log.w("FirestoreManager", "Pull error boundary for $collectionName: ${e.message}")
+            emptyList()
+        }
+    }
 
     /**
      * Listens in real-time to changes in a Firestore collection and emits updates.
@@ -74,7 +104,7 @@ class FirestoreManager {
      * @param data Key-value map representing entity properties.
      */
     fun saveUserDocument(userEmail: String, collectionName: String, documentId: String, data: Map<String, Any>) {
-        val sanitizedEmail = userEmail.replace(".", "_").replace("@", "_at_")
+        val sanitizedEmail = sanitizeEmail(userEmail)
         val path = "users/$sanitizedEmail/$collectionName"
         db?.collection(path)
             ?.document(documentId)
@@ -86,17 +116,12 @@ class FirestoreManager {
                 Log.e("FirestoreManager", "Error syncing $collectionName/$documentId for $userEmail: ${e.message}")
             }
 
-        // Also update standard top-level collection with userEmail tag for analytics
         val dataWithUser = data + ("userEmail" to userEmail) + ("syncedAt" to System.currentTimeMillis())
         saveDocument(collectionName, "${sanitizedEmail}_$documentId", dataWithUser)
     }
 
     /**
      * Upserts a document in a root collection with merge semantics.
-     *
-     * @param collectionName Target collection.
-     * @param documentId Document identifier.
-     * @param data Payload map.
      */
     fun saveDocument(collectionName: String, documentId: String, data: Map<String, Any>) {
         db?.collection(collectionName)
@@ -112,9 +137,6 @@ class FirestoreManager {
 
     /**
      * Deletes a document from a root collection.
-     *
-     * @param collectionName Target collection.
-     * @param documentId Document identifier to remove.
      */
     fun deleteDocument(collectionName: String, documentId: String) {
         db?.collection(collectionName)
@@ -126,5 +148,10 @@ class FirestoreManager {
             ?.addOnFailureListener { e ->
                 Log.e("FirestoreManager", "Error deleting document $documentId from $collectionName: ${e.message}")
             }
+    }
+
+    companion object {
+        fun sanitizeEmail(email: String): String =
+            email.replace(".", "_").replace("@", "_at_")
     }
 }

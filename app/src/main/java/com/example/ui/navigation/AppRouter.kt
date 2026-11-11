@@ -10,8 +10,8 @@ import com.example.domain.model.AppModule
 
 /**
  * AppRouter using MaterialNavigation / Jetpack Navigation to manage transitions
- * between the main dashboard and tracker screens (Habit, Expense, Journal, Tasks, Health, etc.),
- * providing state restoration and deep linking support.
+ * between the main dashboard and tracker screens (Habit, Expense, Journal, Tasks,
+ * Health, Guilds, Reports, Settings, Profile), with deep linking support.
  */
 class AppRouter(val navController: NavHostController) {
 
@@ -31,6 +31,7 @@ class AppRouter(val navController: NavHostController) {
             AppModule.CALENDAR -> "calendar"
             AppModule.AI_ASSISTANT -> "ai_assistant"
             AppModule.REPORTS -> "reports"
+            AppModule.GUILDS -> "guilds"
             AppModule.SETTINGS -> "settings"
             AppModule.PROFILE -> "profile"
             AppModule.AUTH -> "auth"
@@ -47,6 +48,7 @@ class AppRouter(val navController: NavHostController) {
             "calendar" -> AppModule.CALENDAR
             "ai_assistant" -> AppModule.AI_ASSISTANT
             "reports" -> AppModule.REPORTS
+            "guilds" -> AppModule.GUILDS
             "settings" -> AppModule.SETTINGS
             "profile" -> AppModule.PROFILE
             "auth" -> AppModule.AUTH
@@ -68,28 +70,17 @@ class AppRouter(val navController: NavHostController) {
 
         if (currentRoute != targetRoute) {
             navController.navigate(targetRoute) {
-                // Save state of current screen when popping back to start destination
                 popUpTo(navController.graph.findStartDestination().id) {
                     saveState = true
                 }
-                // Avoid multiple copies of the same destination when reselecting
                 launchSingleTop = true
-                // Restore state when reselecting a previously selected item
                 restoreState = true
             }
         }
     }
 
-    /**
-     * Navigates back in the stack.
-     */
-    fun popBackStack(): Boolean {
-        return navController.popBackStack()
-    }
+    fun popBackStack(): Boolean = navController.popBackStack()
 
-    /**
-     * Returns current active AppModule from destination.
-     */
     fun currentModule(): AppModule {
         val route = navController.currentBackStackEntry?.destination?.route
         return moduleForRoute(route)

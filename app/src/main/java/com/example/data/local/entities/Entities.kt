@@ -6,12 +6,12 @@ import androidx.room.PrimaryKey
 
 /**
  * ============================================================================
- * LIFE TRACKER AI — ROOM DATABASE ENTITIES & SCHEMA DEFINITIONS
+ * LIFE TRACKER AI — ROOM DATABASE ENTITIES & SCHEMA DEFINITIONS (V4)
  * ============================================================================
  *
- * Defines the SQLite table structures for offline-first persistence.
- * Each entity maps to a distinct life dimension (productivity, habits, finance,
- * physical health, mental wellbeing, notes, goals, calendar, and gamification).
+ * Defines the SQLite table structures for offline-first persistence and
+ * Last-Write-Wins (LWW) bidirectional Firestore synchronization.
+ * Every entity carries [updatedAt] metadata for conflict resolution.
  */
 
 /**
@@ -21,13 +21,15 @@ import androidx.room.PrimaryKey
  * @property name Human-readable category label (e.g., "Work", "Fitness").
  * @property colorHex Color code in hexadecimal format for UI badge rendering.
  * @property iconName Material icon identifier string.
+ * @property updatedAt Epoch timestamp (ms) of last modification for sync reconciliation.
  */
 @Entity(tableName = "categories")
 data class CategoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val colorHex: String = "#3B82F6",
-    val iconName: String = "Folder"
+    val iconName: String = "Folder",
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -44,6 +46,7 @@ data class CategoryEntity(
  * @property reminderTime Epoch timestamp (ms) for notification trigger.
  * @property isRecurring Flag denoting whether task repeats periodically.
  * @property repeatFrequency Recurrence interval: "Daily", "Weekly", "Monthly", or "None".
+ * @property updatedAt Epoch timestamp (ms) used for Last-Write-Wins conflict resolution.
  */
 @Entity(
     tableName = "tasks",
@@ -60,7 +63,8 @@ data class TaskEntity(
     val dueDate: Long = System.currentTimeMillis(),
     val reminderTime: Long = 0,
     val isRecurring: Boolean = false,
-    val repeatFrequency: String = "None"
+    val repeatFrequency: String = "None",
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -74,6 +78,7 @@ data class TaskEntity(
  * @property isCompletedToday Daily checklist state reset each morning.
  * @property lastCompletedDate Epoch timestamp (ms) when habit was last toggled.
  * @property targetDaysPerWeek Target execution frequency per 7-day cycle.
+ * @property updatedAt Epoch timestamp (ms) used for Last-Write-Wins conflict resolution.
  */
 @Entity(tableName = "habits")
 data class HabitEntity(
@@ -84,7 +89,8 @@ data class HabitEntity(
     val streakCount: Int = 0,
     val isCompletedToday: Boolean = false,
     val lastCompletedDate: Long = 0,
-    val targetDaysPerWeek: Int = 7
+    val targetDaysPerWeek: Int = 7,
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -97,6 +103,7 @@ data class HabitEntity(
  * @property category Budget bucket (e.g., "Food", "Shopping", "Bills", "Salary").
  * @property date Epoch timestamp (ms) when the transaction took place.
  * @property notes Additional context or receipt metadata.
+ * @property updatedAt Epoch timestamp (ms) used for Last-Write-Wins conflict resolution.
  */
 @Entity(
     tableName = "expenses",
@@ -109,7 +116,8 @@ data class ExpenseEntity(
     val type: String = "Expense",
     val category: String = "General",
     val date: Long = System.currentTimeMillis(),
-    val notes: String = ""
+    val notes: String = "",
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -126,6 +134,7 @@ data class ExpenseEntity(
  * @property mood Emotional valence emoji tag (e.g., "😊 Happy", "⚡ Energetic").
  * @property workoutDurationMins Physical exercise duration in minutes.
  * @property workoutType Exercise classification (e.g., "HIIT Cardio", "Strength").
+ * @property updatedAt Epoch timestamp (ms) used for Last-Write-Wins conflict resolution.
  */
 @Entity(tableName = "health_logs")
 data class HealthLogEntity(
@@ -139,7 +148,8 @@ data class HealthLogEntity(
     val caloriesBurned: Int = 0,
     val mood: String = "😊 Happy",
     val workoutDurationMins: Int = 0,
-    val workoutType: String = "General Workout"
+    val workoutType: String = "General Workout",
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -147,12 +157,13 @@ data class HealthLogEntity(
  *
  * @property id Auto-generated 64-bit primary key.
  * @property title Entry header or reflection theme.
- * @property content Full Markdown/text reflections.
+ * @property content Full Markdown/text reflections (supports AES encryption at rest).
  * @property date Epoch timestamp (ms) of composition.
  * @property moodTag Qualitative emotional sentiment (e.g., "Calm", "Grateful").
  * @property tags Comma-separated categorization tags.
  * @property photoUri Optional local URI to an attached media snapshot.
  * @property voiceNoteSnippet Optional transcription snippet of a voice recording.
+ * @property updatedAt Epoch timestamp (ms) used for Last-Write-Wins conflict resolution.
  */
 @Entity(tableName = "journal_entries")
 data class JournalEntity(
@@ -163,7 +174,8 @@ data class JournalEntity(
     val moodTag: String = "Calm",
     val tags: String = "Personal",
     val photoUri: String? = null,
-    val voiceNoteSnippet: String? = null
+    val voiceNoteSnippet: String? = null,
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -204,6 +216,7 @@ data class NoteEntity(
  * @property progressPercent Current completion level from 0 to 100%.
  * @property deadline Target completion timestamp (ms).
  * @property milestones Pipe-separated sub-deliverables.
+ * @property updatedAt Epoch timestamp (ms) used for Last-Write-Wins conflict resolution.
  */
 @Entity(tableName = "goals")
 data class GoalEntity(
@@ -214,7 +227,8 @@ data class GoalEntity(
     val type: String = "Short-term",
     val progressPercent: Int = 0,
     val deadline: Long = System.currentTimeMillis() + 86400000L * 30,
-    val milestones: String = ""
+    val milestones: String = "",
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -227,6 +241,7 @@ data class GoalEntity(
  * @property endTime End time in epoch ms.
  * @property eventType Category: "Event", "Birthday", "Reminder", "Task".
  * @property location Physical address or virtual meeting room URI.
+ * @property updatedAt Epoch timestamp (ms) used for Last-Write-Wins conflict resolution.
  */
 @Entity(
     tableName = "calendar_events",
@@ -239,7 +254,8 @@ data class CalendarEventEntity(
     val startTime: Long = System.currentTimeMillis(),
     val endTime: Long = System.currentTimeMillis() + 3600000L,
     val eventType: String = "Event",
-    val location: String = ""
+    val location: String = "",
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -255,6 +271,7 @@ data class CalendarEventEntity(
  * @property dailyStepGoal Target daily physical steps (default 10000).
  * @property monthlyBudget Financial spending threshold ($ USD).
  * @property avatarId Selected avatar visual identifier index.
+ * @property updatedAt Epoch timestamp (ms) used for Last-Write-Wins conflict resolution.
  */
 @Entity(tableName = "user_profile")
 data class UserProfileEntity(
@@ -266,7 +283,8 @@ data class UserProfileEntity(
     val dailyCalorieGoal: Int = 2200,
     val dailyStepGoal: Int = 10000,
     val monthlyBudget: Double = 3000.0,
-    val avatarId: Int = 1
+    val avatarId: Int = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -278,6 +296,12 @@ data class UserProfileEntity(
  * @property level Current calculated Hunter Rank level (Level = XP / 500 + 1).
  * @property coins In-app currency awarded for quest completion.
  * @property streakDays Highest continuous overall activity streak.
+ * @property strength Allocated Strength attribute points.
+ * @property agility Allocated Agility attribute points.
+ * @property intelligence Allocated Intelligence attribute points.
+ * @property vitality Allocated Vitality attribute points.
+ * @property sense Allocated Sense attribute points.
+ * @property unallocatedPoints Remaining spendable stat points from level-ups.
  * @property updatedAt Epoch timestamp of last stat modification.
  */
 @Entity(tableName = "user_stats")
@@ -287,5 +311,35 @@ data class UserStatsEntity(
     val level: Int = 5,
     val coins: Int = 450,
     val streakDays: Int = 21,
+    val strength: Int = 18,
+    val agility: Int = 22,
+    val intelligence: Int = 25,
+    val vitality: Int = 20,
+    val sense: Int = 19,
+    val unallocatedPoints: Int = 5,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * Represents collaborative Social Guild membership and raid contributions.
+ *
+ * @property id Guild ID primary key.
+ * @property guildName Display name of the Hunter Guild.
+ * @property guildMotto Collaborative team motto.
+ * @property raidBossName Active weekly collaborative raid boss title.
+ * @property raidBossHp Total HP of the active weekly challenge.
+ * @property raidDamageDealt Cumulative team damage contributed via tasks and habits.
+ * @property personalContributionXp User's personal XP contributed to this guild.
+ * @property updatedAt Epoch timestamp (ms) of last guild contribution.
+ */
+@Entity(tableName = "guild_progress")
+data class GuildProgressEntity(
+    @PrimaryKey val id: Int = 1,
+    val guildName: String = "Shadow Vanguard",
+    val guildMotto: String = "Discipline Conquers All Dungeons",
+    val raidBossName: String = "Igris: Productivity Citadel",
+    val raidBossHp: Int = 5000,
+    val raidDamageDealt: Int = 3450,
+    val personalContributionXp: Int = 1250,
     val updatedAt: Long = System.currentTimeMillis()
 )

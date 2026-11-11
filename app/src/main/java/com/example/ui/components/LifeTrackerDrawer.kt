@@ -90,97 +90,33 @@ fun LifeTrackerDrawerContent(
                 modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
             )
 
-            DrawerItem(
-                module = AppModule.DASHBOARD,
-                icon = Icons.Default.Dashboard,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.TASKS,
-                icon = Icons.Default.CheckCircle,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.HABITS,
-                icon = Icons.Default.LocalFireDepartment,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.EXPENSES,
-                icon = Icons.Default.AccountBalanceWallet,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.HEALTH,
-                icon = Icons.Default.Favorite,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.JOURNAL,
-                icon = Icons.Default.Book,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.NOTES,
-                icon = Icons.Default.StickyNote2,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.GOALS,
-                icon = Icons.Default.TrackChanges,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.CALENDAR,
-                icon = Icons.Default.CalendarMonth,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
+            DrawerItem(AppModule.DASHBOARD, Icons.Default.Dashboard, currentModule, onModuleSelected)
+            DrawerItem(AppModule.TASKS, Icons.Default.CheckCircle, currentModule, onModuleSelected)
+            DrawerItem(AppModule.HABITS, Icons.Default.LocalFireDepartment, currentModule, onModuleSelected)
+            DrawerItem(AppModule.EXPENSES, Icons.Default.AccountBalanceWallet, currentModule, onModuleSelected)
+            DrawerItem(AppModule.HEALTH, Icons.Default.Favorite, currentModule, onModuleSelected)
+            DrawerItem(AppModule.JOURNAL, Icons.Default.Book, currentModule, onModuleSelected)
+            DrawerItem(AppModule.NOTES, Icons.Default.StickyNote2, currentModule, onModuleSelected)
+            DrawerItem(AppModule.GOALS, Icons.Default.TrackChanges, currentModule, onModuleSelected)
+            DrawerItem(AppModule.CALENDAR, Icons.Default.CalendarMonth, currentModule, onModuleSelected)
 
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "AI & ANALYTICS",
+                text = "AI, GUILDS & ANALYTICS",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
             )
 
-            DrawerItem(
-                module = AppModule.AI_ASSISTANT,
-                icon = Icons.Default.AutoAwesome,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.REPORTS,
-                icon = Icons.Default.BarChart,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.SETTINGS,
-                icon = Icons.Default.Settings,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
-            DrawerItem(
-                module = AppModule.PROFILE,
-                icon = Icons.Default.Person,
-                currentModule = currentModule,
-                onSelect = onModuleSelected
-            )
+            DrawerItem(AppModule.AI_ASSISTANT, Icons.Default.AutoAwesome, currentModule, onModuleSelected)
+            DrawerItem(AppModule.GUILDS, Icons.Default.Groups, currentModule, onModuleSelected)
+            DrawerItem(AppModule.REPORTS, Icons.Default.BarChart, currentModule, onModuleSelected)
+            DrawerItem(AppModule.SETTINGS, Icons.Default.Settings, currentModule, onModuleSelected)
+            DrawerItem(AppModule.PROFILE, Icons.Default.Person, currentModule, onModuleSelected)
 
             Spacer(modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.height(16.dp))

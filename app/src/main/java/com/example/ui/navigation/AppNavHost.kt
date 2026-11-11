@@ -2,6 +2,10 @@ package com.example.ui.navigation
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -16,6 +20,7 @@ import com.example.ui.screens.calendar.CalendarScreen
 import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.expenses.ExpenseScreen
 import com.example.ui.screens.goals.GoalScreen
+import com.example.ui.screens.guilds.GuildScreen
 import com.example.ui.screens.habits.HabitScreen
 import com.example.ui.screens.health.HealthScreen
 import com.example.ui.screens.journal.JournalScreen
@@ -26,12 +31,6 @@ import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.tasks.TaskScreen
 import com.example.ui.viewmodel.AiChatMessage
 import com.example.ui.viewmodel.LifeTrackerViewModel
-
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.core.tween
 
 @Composable
 fun AppNavHost(
@@ -51,6 +50,8 @@ fun AppNavHost(
     aiMessages: List<AiChatMessage>,
     isAiLoading: Boolean,
     isDarkMode: Boolean,
+    liveSensorSteps: Int = 0,
+    isStepSensorAvailable: Boolean = false,
     context: Context,
     modifier: Modifier = Modifier
 ) {
@@ -147,14 +148,17 @@ fun AppNavHost(
             )
         }
 
-        // Health Screen
+        // Health & Sensor Screen
         composable(
             route = AppRouter.routeForModule(AppModule.HEALTH),
             deepLinks = AppRouter.createDeepLinks(AppRouter.routeForModule(AppModule.HEALTH))
         ) {
             HealthScreen(
                 healthLog = latestHealth,
+                liveSensorSteps = liveSensorSteps,
+                isSensorAvailable = isStepSensorAvailable,
                 onAddWater = { amount -> viewModel.addWaterIntake(amount) },
+                onSyncSteps = { stepsDelta -> viewModel.syncPedometerSteps(stepsDelta) },
                 onUpdateMetrics = { w, h, s, steps, mood, workout ->
                     viewModel.logHealthMetrics(w, h, s, steps, mood, workout)
                     Toast.makeText(context, "Health metrics saved ❤️", Toast.LENGTH_SHORT).show()
@@ -245,20 +249,34 @@ fun AppNavHost(
             )
         }
 
-        // Reports Screen
+        // Hunter Guilds & Collaborative Raids Screen
+        composable(
+            route = AppRouter.routeForModule(AppModule.GUILDS),
+            deepLinks = AppRouter.createDeepLinks(AppRouter.routeForModule(AppModule.GUILDS))
+        ) {
+            val guildProgress by viewModel.guildProgress.collectAsState()
+            GuildScreen(
+                guildProgress = guildProgress,
+                userName = userProfile?.name ?: "Hunter",
+                userStats = userStats,
+                onDealRaidStrike = { dmg -> viewModel.dealGuildRaidStrike(dmg) },
+                onSwitchGuild = { name, motto -> viewModel.switchGuildName(name, motto) }
+            )
+        }
+
+        // Reports & PDF/CSV Export Screen
         composable(
             route = AppRouter.routeForModule(AppModule.REPORTS),
             deepLinks = AppRouter.createDeepLinks(AppRouter.routeForModule(AppModule.REPORTS))
         ) {
-            val expTotal = expenses.filter { it.type == "Expense" }.sumOf { it.amount }
-            val maxStreak = habits.maxOfOrNull { it.streakCount } ?: 0
-            val waterAvg = latestHealth?.waterIntakeMl ?: 0
-
             ReportsScreen(
-                taskCount = tasks.count { it.isCompleted },
-                expenseTotal = expTotal,
-                habitStreakMax = maxStreak,
-                waterIntakeAverage = waterAvg
+                tasks = tasks,
+                habits = habits,
+                expenses = expenses,
+                latestHealth = latestHealth,
+                userName = userProfile?.name ?: "Hunter",
+                level = userStats?.level ?: 1,
+                totalXp = userStats?.totalXp ?: 0
             )
         }
 
@@ -268,6 +286,7 @@ fun AppNavHost(
             deepLinks = AppRouter.createDeepLinks(AppRouter.routeForModule(AppModule.SETTINGS))
         ) {
             val syncStatus by viewModel.syncStatus.collectAsState()
+            val syncReport by viewModel.syncReport.collectAsState()
             val backupJson by viewModel.backupJsonString.collectAsState()
             val restoreMessage by viewModel.restoreMessage.collectAsState()
 
@@ -275,6 +294,7 @@ fun AppNavHost(
                 isDarkMode = isDarkMode,
                 userEmail = userEmail,
                 syncStatus = syncStatus,
+                syncReport = syncReport,
                 backupJson = backupJson,
                 restoreMessage = restoreMessage,
                 onToggleDarkMode = { dark ->
@@ -285,17 +305,13 @@ fun AppNavHost(
                         darkMode = dark
                     )
                 },
-                onBackupData = {
-                    viewModel.exportBackupJson()
-                },
-                onRestoreData = { jsonInput ->
-                    viewModel.restoreFromJson(jsonInput)
-                },
+                onBackupData = { viewModel.exportBackupJson() },
+                onRestoreData = { jsonInput -> viewModel.restoreFromJson(jsonInput) },
                 onClearBackupJson = { viewModel.clearBackupJson() },
                 onClearRestoreMessage = { viewModel.clearRestoreMessage() },
                 onTriggerCloudSync = {
                     viewModel.triggerCloudSync()
-                    Toast.makeText(context, "Syncing data with Google Account... ☁️", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Running two-way cloud sync... ☁️", Toast.LENGTH_SHORT).show()
                 },
                 onClearAllData = {
                     viewModel.clearAllUserData()
